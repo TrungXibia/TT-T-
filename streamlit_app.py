@@ -488,22 +488,7 @@ else:
     # Lookup for verification
     check_source_lookup = df_check_source.set_index('date') if df_check_source is not None and not df_check_source.empty else pd.DataFrame()
     
-    # Tạo 1 bảng duy nhất dạng tam giác
-    # Mỗi dòng = 1 mốc (số từ các dàn)
-    # Tạo danh sách tất cả các mốc với thông tin ngày
-    all_mocs = []
-    for row_idx, day_data in enumerate(all_days_data):
-        date, source, combos, i = day_data['date'], day_data['source'], day_data['combos'], day_data['index']
-        for combo in sorted(combos):
-            all_mocs.append({
-                'combo': combo,
-                'date': date,
-                'source': source,
-                'row_idx': row_idx,
-                'i': i
-            })
-    
-    # Tạo bảng HTML
+    # Tạo bảng HTML dạng tam giác
     table_html = "<div class='table-wrapper'>"
     table_html += "<table class='tracking-table'><thead><tr>"
     table_html += "<th>Mốc</th>"
@@ -513,16 +498,13 @@ else:
         table_html += f"<th>N{k}</th>"
     table_html += "</tr></thead><tbody>"
     
-    # Render từng mốc
-    for moc_data in all_mocs:
-        combo = moc_data['combo']
-        date = moc_data['date']
-        row_idx = moc_data['row_idx']
-        i = moc_data['i']
+    # Mỗi dòng = 1 dàn (1 ngày)
+    for row_idx, day_data in enumerate(all_days_data):
+        date, source, combos, i = day_data['date'], day_data['source'], day_data['combos'], day_data['index']
         
         table_html += "<tr>"
-        # Cột Mốc: hiển thị số + ngày
-        table_html += f"<td class='moc-col'>{combo}<br><small style='font-size:9px;color:#6c757d;'>{date}</small></td>"
+        # Cột Mốc: hiển thị ngày + số lượng
+        table_html += f"<td class='moc-col'>{date}<br><small style='font-size:9px;color:#6c757d;'>({len(combos)} số)</small></td>"
         
         # Số cột thực tế cho dòng này (dạng tam giác)
         num_cols_this_row = min(row_idx + 1, MAX_COLS)
@@ -567,10 +549,10 @@ else:
                             if isinstance(res_list, list):
                                 check_results = res_list
                 
-                # Kiểm tra xem combo này có trúng không
+                # Kiểm tra xem CÓ SỐ NÀO trong dàn này trúng không
                 is_hit = False
                 for res in check_results:
-                    if res['val'] == combo:
+                    if res['val'] in combos:
                         is_hit = True
                         break
                 
