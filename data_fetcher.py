@@ -85,6 +85,22 @@ def get_stations_by_day(region: str, day: str) -> List[str]:
         return LICH_QUAY_TRUNG.get(day, [])
     return []
 
+def get_all_stations_in_region(region: str) -> List[str]:
+    """
+    Get all unique stations for a region across all days.
+    """
+    stations = set()
+    schedule = {}
+    if region == "Miền Nam":
+        schedule = LICH_QUAY_NAM
+    elif region == "Miền Trung":
+        schedule = LICH_QUAY_TRUNG
+        
+    for day_stations in schedule.values():
+        stations.update(day_stations)
+        
+    return sorted(list(stations))
+
 def fetch_station_data(station_name: str, total_days: int = 60) -> List[Dict]:
     """
     Fetch lottery data for a specific station from API.
