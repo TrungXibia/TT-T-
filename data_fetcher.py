@@ -186,6 +186,21 @@ def fetch_url(url: str, max_retries: int = 3) -> BeautifulSoup:
                 return None
     return None
 
+def _normalize_date(date_str: str) -> str:
+    """
+    Normalize date string from 'Thứ Hai ngày 24-11-2025' to '24/11/2025'.
+    Also handles '24-11-2025' -> '24/11/2025'.
+    """
+    try:
+        # Remove "Thứ ... ngày " prefix if present
+        if "ngày" in date_str:
+            date_str = date_str.split("ngày")[-1].strip()
+        
+        # Replace - with /
+        return date_str.replace("-", "/")
+    except:
+        return date_str
+
 def fetch_dien_toan(total_days: int) -> List[Dict]:
     """Fetch Điện Toán 123 data with validation."""
     soup = fetch_url(f"https://ketqua04.net/so-ket-qua-dien-toan-123/{total_days}")
@@ -199,10 +214,12 @@ def fetch_dien_toan(total_days: int) -> List[Dict]:
         divs = soup.find_all("div", class_="result_div", id="result_123")
         for div in divs[:total_days]:
             ds = div.find("span", id="result_date")
-            date = ds.text.strip() if ds else ""
+            date_raw = ds.text.strip() if ds else ""
             
-            if not date:
+            if not date_raw:
                 continue
+            
+            date = _normalize_date(date_raw)
                 
             tbl = div.find("table", id="result_tab_123")
             if tbl:
@@ -231,10 +248,12 @@ def fetch_than_tai(total_days: int) -> List[Dict]:
         divs = soup.find_all("div", class_="result_div", id="result_tt4")
         for div in divs[:total_days]:
             ds = div.find("span", id="result_date")
-            date = ds.text.strip() if ds else ""
+            date_raw = ds.text.strip() if ds else ""
             
-            if not date:
+            if not date_raw:
                 continue
+            
+            date = _normalize_date(date_raw)
                 
             tbl = div.find("table", id="result_tab_tt4")
             if tbl:
