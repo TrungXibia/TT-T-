@@ -96,10 +96,13 @@ def fetch_station_data(station_name: str, total_days: int = 60) -> List[Dict]:
     Returns:
         List of lottery results with date and prizes
     """
-    url = DAI_API.get(station_name)
-    if not url:
+    url_template = DAI_API.get(station_name)
+    if not url_template:
         logging.error(f"No API URL found for station: {station_name}")
         return []
+    
+    # Replace limitNum=60 with limitNum={total_days}
+    url = url_template.replace("limitNum=60", f"limitNum={total_days}")
     
     try:
         response = requests.get(url, headers=HEADERS, timeout=10)
