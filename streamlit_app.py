@@ -116,10 +116,11 @@ st.markdown("""
     }
     
     .tracking-table td {
-        padding: 4px 2px;
+        padding: 3px 1px;
         border: 1px solid #dee2e6;
         text-align: center;
         font-size: 11px;
+        max-width: 35px;
     }
     
     .tracking-table td.moc-col {
@@ -128,7 +129,7 @@ st.markdown("""
         color: #2c3e50;
         font-size: 11px;
         padding: 3px 2px;
-        max-width: 50px;
+        max-width: 40px;
     }
     
     .cell-hit {
@@ -507,7 +508,7 @@ else:
         
         table_html += "<tr>"
         # Cột Ngày
-        table_html += f"<td style='font-size:9px;color:#495057;'>{date}</td>"
+        table_html += f"<td style='font-size:8px;color:#495057;max-width:50px;padding:2px 1px;'>{date}</td>"
         # Cột Mốc: hiển thị số giải
         table_html += f"<td class='moc-col'>{source}</td>"
         
