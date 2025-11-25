@@ -260,25 +260,48 @@ df_show = df_full.head(days_show).copy()
 st.title("🎯 DÀN NUÔI (MATRIX)")
 st.divider()
 
-# Tạo 5 cột: Nguồn, Miền, So với, Khung nuôi, Backtest
-c1, c2, c3, c4, c5 = st.columns([1, 1, 1.5, 1.5, 1.5])
-
+# Row 1: Nguồn và Miền
+c1, c2 = st.columns([1, 1])
 src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán"])
-
-# Dropdown chọn Miền
 region = c2.selectbox("Miền:", ["Miền Bắc", "Miền Nam", "Miền Trung"])
 
-# Dropdown "So với" thay đổi theo Miền
+# Row 2: Thứ, Đài, Giải (cho Miền Nam/Trung) hoặc So với (cho Miền Bắc)
 if region == "Miền Bắc":
-    comp_options = ["XSMB (ĐB)", "Giải Nhất"]
-elif region == "Miền Nam":
-    comp_options = ["XSMN (ĐB)", "Giải Nhất"]
-else:  # Miền Trung
-    comp_options = ["XSMT (ĐB)", "Giải Nhất"]
-
-comp_mode = c3.selectbox("So với:", comp_options)
-check_range = c4.slider("Khung nuôi (ngày):", 1, 20, 7)
-backtest_mode = c5.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
+    # Miền Bắc: Giữ nguyên logic cũ
+    c3, c4, c5 = st.columns([1.5, 1.5, 1.5])
+    comp_mode = c3.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất"])
+    check_range = c4.slider("Khung nuôi (ngày):", 1, 20, 7)
+    backtest_mode = c5.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
+    
+    # Xác định cột so sánh
+    col_comp = "xsmb_2so" if "ĐB" in comp_mode else "g1_2so"
+    selected_station = None
+    
+else:
+    # Miền Nam/Trung: Hệ thống mới với Thứ/Đài/Giải
+    c3, c4, c5, c6, c7 = st.columns([1, 1.5, 1, 1.5, 1.5])
+    
+    # Dropdown Thứ
+    weekdays = ["Chủ Nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"]
+    selected_day = c3.selectbox("Thứ:", weekdays)
+    
+    # Dropdown Đài (dựa trên Miền và Thứ)
+    stations = data_fetcher.get_stations_by_day(region, selected_day)
+    if not stations:
+        st.error(f"⚠️ Không có đài nào mở thưởng vào {selected_day} ở {region}")
+        st.stop()
+    
+    selected_station = c4.selectbox("Đài:", stations)
+    
+    # Dropdown Giải
+    prize_mode = c5.selectbox("Giải:", ["Đặc Biệt", "Giải Nhất"])
+    
+    # Khung nuôi và Backtest
+    check_range = c6.slider("Khung nuôi (ngày):", 1, 20, 7)
+    backtest_mode = c7.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
+    
+    # Xác định cột so sánh
+    col_comp = "db_2so" if prize_mode == "Đặc Biệt" else "g1_2so"
 
 # Tự động phân tích
 backtest_offset = 0
@@ -288,27 +311,43 @@ if backtest_mode != "Hiện tại":
 if backtest_offset > 0:
     st.info(f"🔍 Backtest: Từ {backtest_offset} ngày trước")
 
-# Xác định cột so sánh dựa trên Miền và loại giải
-# Hiện tại chỉ có dữ liệu Miền Bắc, các miền khác sẽ cần thêm sau
+# === LOAD DỮ LIỆU ===
 if region == "Miền Bắc":
-    col_comp = "xsmb_2so" if "ĐB" in comp_mode else "g1_2so"
+    # Sử dụng dữ liệu df_full đã load sẵn từ trước
+    df_region = df_full
 else:
-    # Placeholder cho Miền Nam và Miền Trung - cần thêm data fetcher
-    st.warning(f"⚠️ Chức năng {region} đang được phát triển. Hiện tại chỉ hỗ trợ Miền Bắc.")
-    col_comp = "xsmb_2so"  # Tạm thời dùng Miền Bắc
+    # Load dữ liệu từ API cho đài đã chọn
+    with st.spinner(f"🔄 Đang tải dữ liệu {selected_station}..."):
+        station_data = data_fetcher.fetch_station_data(selected_station, total_days=60)
+        
+        if not station_data:
+            st.error(f"⚠️ Không thể tải dữ liệu cho {selected_station}")
+            st.stop()
+        
+        # Chuyển đổi sang DataFrame
+        df_region = pd.DataFrame(station_data)
 
 
 all_days_data = []
 start_idx = backtest_offset
-end_idx = min(backtest_offset + 20, len(df_full))  # Sử dụng df_full thay vì df_show
+end_idx = min(backtest_offset + 20, len(df_region))
 
 for i in range(start_idx, end_idx):
-    row = df_full.iloc[i]
+    row = df_region.iloc[i]
     src_str = ""
-    if src_mode == "Thần Tài": 
-        src_str = str(row.get('tt_number', ''))
-    elif src_mode == "Điện Toán": 
-        src_str = "".join(row.get('dt_numbers', []))
+    
+    if region == "Miền Bắc":
+        # Miền Bắc: Sử dụng Thần Tài hoặc Điện Toán
+        if src_mode == "Thần Tài": 
+            src_str = str(row.get('tt_number', ''))
+        elif src_mode == "Điện Toán": 
+            src_str = "".join(row.get('dt_numbers', []))
+    else:
+        # Miền Nam/Trung: Sử dụng số từ giải đã chọn
+        if prize_mode == "Đặc Biệt":
+            src_str = str(row.get('db', ''))
+        else:  # Giải Nhất
+            src_str = str(row.get('g1', ''))
     
     if not src_str or src_str == "nan": 
         continue
@@ -351,7 +390,7 @@ else:
             
             # Chỉ hiển thị kết quả nếu idx >= backtest_offset (không xem "tương lai")
             if idx >= 0 and idx >= backtest_offset:
-                val_res = df_full.iloc[idx][col_comp]
+                val_res = df_region.iloc[idx][col_comp]
                 if val_res in combos:
                     cell_val, bg_color, text_color = "✅", "#27ae60", "white"
                 else:
@@ -376,7 +415,7 @@ else:
             # Chỉ tính nếu idx >= backtest_offset (không tính "tương lai")
             if idx >= 0 and idx >= backtest_offset:
                 total_checks += 1
-                if df_full.iloc[idx][col_comp] in combos:
+                if df_region.iloc[idx][col_comp] in combos:
                     total_hits += 1
     
     hit_rate = round(total_hits / total_checks * 100, 1) if total_checks > 0 else 0
@@ -406,7 +445,7 @@ else:
         for k in range(1, num_cols_this_row + 1):
             idx = i - k
             if idx >= 0 and idx >= backtest_offset:
-                val_res = df_full.iloc[idx][col_comp]
+                val_res = df_region.iloc[idx][col_comp]
                 if val_res in combos:
                     hit_numbers.add(val_res)
         
@@ -493,7 +532,7 @@ else:
         for k in range(1, num_cols_this_row + 1):
             idx = i - k
             if idx >= 0 and idx >= backtest_offset:
-                val_res = df_full.iloc[idx][col_comp]
+                val_res = df_region.iloc[idx][col_comp]
                 if val_res in combos:
                     hits.append(k)
                 else:
