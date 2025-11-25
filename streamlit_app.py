@@ -58,43 +58,50 @@ st.set_page_config(
 # --- CSS FIX LỖI FONT & GIAO DIỆN + RESPONSIVE ---
 st.markdown("""
 <style>
-    /* Fix lỗi font menu bị chìm trong dark mode */
+    /* Tối ưu spacing */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+    
+    /* Compact columns */
+    [data-testid="column"] {
+        padding: 0 0.3rem !important;
+    }
+    
+    /* Fix lỗi font menu */
     .stTabs [data-baseweb="tab-list"] { gap: 4px; }
     .stTabs [data-baseweb="tab"] {
         height: 50px;
         background-color: #e0e0e0;
         border-radius: 5px 5px 0 0;
         padding: 10px;
-        color: #000000 !important; /* Ép màu chữ đen */
+        color: #000000 !important;
         font-weight: 600;
     }
     .stTabs [aria-selected="true"] {
         background-color: #ff4b4b !important;
         color: #ffffff !important;
-        border-top: 2px solid #ff4b4b;
     }
-    /* Căn giữa ô bảng */
-    .stDataFrame td { vertical-align: middle !important; }
     
-    /* === RESPONSIVE TABLE WRAPPER === */
+    /* RESPONSIVE TABLE */
     .table-wrapper {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
-        margin: 10px 0;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin: 5px 0;
+        border-radius: 6px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
     }
     
-    /* === RESPONSIVE TABLE STYLES === */
     .responsive-table {
         border-collapse: collapse;
         width: 100%;
-        font-size: 12px;
-        min-width: 600px; /* Minimum width để table không bị vỡ */
+        font-size: 11px;
+        min-width: 500px;
     }
     
     .responsive-table th {
-        padding: 6px 4px;
+        padding: 4px 2px;
         border: 1px solid #34495e;
         background-color: #2c3e50;
         color: white;
@@ -103,138 +110,29 @@ st.markdown("""
         position: sticky;
         top: 0;
         z-index: 10;
-        font-size: 11px;
+        font-size: 10px;
     }
     
     .responsive-table td {
-        padding: 5px 3px;
+        padding: 4px 2px;
         border: 1px solid #dee2e6;
         text-align: center;
+        font-size: 10px;
     }
     
-    /* Sticky first 2 columns on desktop */
-    @media (min-width: 768px) {
-        .responsive-table th:nth-child(1),
-        .responsive-table td:nth-child(1) {
-            position: sticky;
-            left: 0;
-            z-index: 5;
-            background-color: #2c3e50;
-        }
-        
-        .responsive-table td:nth-child(1) {
-            background-color: inherit;
-            font-weight: bold;
-        }
-        
-        .responsive-table th:nth-child(2),
-        .responsive-table td:nth-child(2) {
-            position: sticky;
-            left: 80px;
-            z-index: 5;
-        }
-    }
-    
-    /* === MOBILE RESPONSIVE (< 768px) === */
-    @media (max-width: 767px) {
+    /* Mobile optimization */
+    @media (max-width: 768px) {
         .responsive-table {
-            font-size: 11px;
-            min-width: 100%;
-        }
-        
-        .responsive-table th {
-            padding: 4px 3px;
-            font-size: 10px;
-        }
-        
-        .responsive-table td {
-            padding: 4px 2px;
-            font-size: 11px;
-        }
-        
-        /* Giảm width cho cột ngày và giải */
-        .responsive-table th:nth-child(1),
-        .responsive-table td:nth-child(1) {
-            min-width: 70px;
-            font-size: 10px;
-        }
-        
-        .responsive-table th:nth-child(2),
-        .responsive-table td:nth-child(2) {
-            min-width: 50px;
-        }
-        
-        .responsive-table th:nth-child(3),
-        .responsive-table td:nth-child(3) {
-            min-width: 120px;
             font-size: 9px;
+            min-width: 400px;
         }
-        
-        .responsive-table th:nth-child(4),
-        .responsive-table td:nth-child(4) {
-            min-width: 40px;
-        }
-        
-        /* Cột N1, N2, N3... */
-        .responsive-table th:nth-child(n+5),
-        .responsive-table td:nth-child(n+5) {
-            min-width: 32px;
-            padding: 3px 2px;
-        }
-    }
-    
-    /* === EXTRA SMALL MOBILE (< 480px) === */
-    @media (max-width: 479px) {
-        .responsive-table {
-            font-size: 10px;
-        }
-        
-        .responsive-table th {
-            padding: 3px 2px;
-            font-size: 9px;
-        }
-        
+        .responsive-table th,
         .responsive-table td {
             padding: 3px 1px;
-            font-size: 10px;
-        }
-        
-        .responsive-table th:nth-child(1),
-        .responsive-table td:nth-child(1) {
-            min-width: 60px;
             font-size: 9px;
         }
-        
-        .responsive-table th:nth-child(2),
-        .responsive-table td:nth-child(2) {
-            min-width: 45px;
-        }
-        
-        .responsive-table th:nth-child(3),
-        .responsive-table td:nth-child(3) {
-            min-width: 100px;
-            font-size: 8px;
-        }
-        
-        .responsive-table th:nth-child(n+5),
-        .responsive-table td:nth-child(n+5) {
-            min-width: 30px;
-            padding: 2px 1px;
-        }
-    }
-    
-    /* Scroll indicator hint */
-    .scroll-hint {
-        text-align: center;
-        color: #7f8c8d;
-        font-size: 12px;
-        margin-top: 5px;
-        display: none;
-    }
-    
-    @media (max-width: 767px) {
-        .scroll-hint {
-            display: block;
+        [data-testid="column"] {
+            padding: 0 0.1rem !important;
         }
     }
 </style>
@@ -322,7 +220,7 @@ if region == "Miền Bắc":
     
 else:
     # Miền Nam/Trung: Hệ thống mới với Thứ/Đài/Giải
-    c3, c4, c5, c6, c7 = st.columns([1, 1.5, 1, 1.5, 1.5])
+    c3, c4, c5, c6, c7 = st.columns([1, 1.2, 0.8, 1, 1])
     
     # Dropdown Thứ
     weekdays = ["Tất cả", "Chủ Nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"]
@@ -330,9 +228,9 @@ else:
     
     # Dropdown Đài (dựa trên Miền và Thứ)
     if selected_day == "Tất cả":
-        # Nếu chọn tất cả các thứ, tự động chọn tất cả các đài
+        # Nếu chọn tất cả các thứ, tự động chọn tất cả các đài (không hiện info)
         selected_station = "Tất cả"
-        c4.info("📌 Tự động chọn tất cả các đài")
+        c4.selectbox("Đài:", ["Tất cả"], disabled=True)
     else:
         stations = data_fetcher.get_stations_by_day(region, selected_day)
         if not stations:
@@ -344,14 +242,14 @@ else:
         selected_station = c4.selectbox("Đài:", station_options)
     
     # Dropdown Giải
-    prize_mode = c5.selectbox("Giải:", ["Đặc Biệt", "Giải Nhất"])
+    prize_mode = c5.selectbox("Giải:", ["ĐB", "G1"])
     
     # Khung nuôi và Backtest
-    check_range = c6.slider("Khung nuôi (ngày):", 1, 20, 7)
-    backtest_mode = c7.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
+    check_range = c6.slider("Khung:", 1, 20, 7)
+    backtest_mode = c7.selectbox("Backtest:", ["Hiện tại", "Lùi 1", "Lùi 2", "Lùi 3", "Lùi 4", "Lùi 5"])
     
     # Xác định cột so sánh
-    col_comp = "db_2so" if prize_mode == "Đặc Biệt" else "g1_2so"
+    col_comp = "db_2so" if prize_mode == "ĐB" else "g1_2so"
 
 # Tự động phân tích
 backtest_offset = 0
