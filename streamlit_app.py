@@ -7,6 +7,46 @@ from datetime import datetime, timedelta
 import importlib
 importlib.reload(data_fetcher)
 
+# Mapping viết tắt tên đài
+STATION_ABBR = {
+    "TP. Hồ Chí Minh": "HCM",
+    "Đồng Tháp": "ĐT",
+    "Cà Mau": "CM",
+    "Bến Tre": "BT",
+    "Vũng Tàu": "VT",
+    "Bạc Liêu": "BL",
+    "Đồng Nai": "ĐN",
+    "Cần Thơ": "CT",
+    "Sóc Trăng": "ST",
+    "Tây Ninh": "TN",
+    "An Giang": "AG",
+    "Bình Thuận": "BTh",
+    "Vĩnh Long": "VL",
+    "Bình Dương": "BĐ",
+    "Trà Vinh": "TV",
+    "Long An": "LA",
+    "Bình Phước": "BP",
+    "Hậu Giang": "HG",
+    "Tiền Giang": "TG",
+    "Kiên Giang": "KG",
+    "Đà Lạt": "ĐL",
+    # Miền Trung
+    "Thừa Thiên Huế": "TTH",
+    "Phú Yên": "PY",
+    "Đắk Lắk": "ĐLk",
+    "Quảng Nam": "QNa",
+    "Đà Nẵng": "ĐN",
+    "Khánh Hòa": "KH",
+    "Bình Định": "BĐ",
+    "Quảng Trị": "QT",
+    "Quảng Bình": "QB",
+    "Gia Lai": "GL",
+    "Ninh Thuận": "NT",
+    "Đắk Nông": "ĐNo",
+    "Quảng Ngãi": "QNg",
+    "Kon Tum": "KT"
+}
+
 # --- CẤU HÌNH ---
 st.set_page_config(
     page_title="SIÊU GÀ APP - PRO",
@@ -576,8 +616,11 @@ else:
                 display_strs = []
                 for h in hit_stations:
                     st_name = h['station']
-                    if st_name == "XSMB": st_name = ""
-                    else: st_name = f" ({st_name})"
+                    if st_name == "XSMB": 
+                        st_name = ""
+                    else: 
+                        st_name = STATION_ABBR.get(st_name, st_name)  # Use abbreviation
+                        st_name = f" ({st_name})"
                     display_strs.append(f"{h['val']}{st_name}")
                 cell_content = "<br>".join(display_strs)
             else:
@@ -587,8 +630,11 @@ else:
                      limit_disp = 2 if len(check_results) > 2 else len(check_results)
                      for res in check_results[:limit_disp]:
                          st_name = res['station']
-                         if st_name == "XSMB": st_name = ""
-                         else: st_name = f" ({st_name})"
+                         if st_name == "XSMB": 
+                             st_name = ""
+                         else: 
+                             st_name = STATION_ABBR.get(st_name, st_name)  # Use abbreviation
+                             st_name = f" ({st_name})"
                          display_strs.append(f"{res['val']}{st_name}")
                      cell_content = "<br>".join(display_strs)
                      if len(check_results) > limit_disp: cell_content += "..."
