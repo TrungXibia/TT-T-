@@ -116,17 +116,19 @@ st.markdown("""
     }
     
     .tracking-table td {
-        padding: 8px 4px;
+        padding: 4px 2px;
         border: 1px solid #dee2e6;
         text-align: center;
-        font-size: 13px;
+        font-size: 11px;
     }
     
     .tracking-table td.moc-col {
         font-weight: bold;
         background-color: #f8f9fa;
         color: #2c3e50;
-        font-size: 14px;
+        font-size: 11px;
+        padding: 3px 2px;
+        max-width: 50px;
     }
     
     .cell-hit {
@@ -491,6 +493,7 @@ else:
     # Tạo bảng HTML dạng tam giác
     table_html = "<div class='table-wrapper'>"
     table_html += "<table class='tracking-table'><thead><tr>"
+    table_html += "<th>Ngày</th>"
     table_html += "<th>Mốc</th>"
     
     # Header columns N1, N2, ... N10
@@ -503,8 +506,10 @@ else:
         date, source, combos, i = day_data['date'], day_data['source'], day_data['combos'], day_data['index']
         
         table_html += "<tr>"
-        # Cột Mốc: hiển thị ngày + số lượng
-        table_html += f"<td class='moc-col'>{date}<br><small style='font-size:9px;color:#6c757d;'>({len(combos)} số)</small></td>"
+        # Cột Ngày
+        table_html += f"<td style='font-size:9px;color:#495057;'>{date}</td>"
+        # Cột Mốc: hiển thị số giải
+        table_html += f"<td class='moc-col'>{source}</td>"
         
         # Số cột thực tế cho dòng này (dạng tam giác)
         num_cols_this_row = min(row_idx + 1, MAX_COLS)
