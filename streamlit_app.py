@@ -335,6 +335,25 @@ end_idx = min(backtest_offset + 20, len(df_region))
 # Tạo lookup dictionary cho df_full để tra cứu nhanh theo ngày
 df_full_lookup = df_full.set_index('date') if not df_full.empty else pd.DataFrame()
 
+# --- DEBUG SECTION ---
+with st.expander("🐞 Debug Data (Click để xem chi tiết lỗi)"):
+    st.write("Region:", region)
+    st.write("Total Days Data:", len(all_days_data))
+    
+    c_d1, c_d2 = st.columns(2)
+    with c_d1:
+        st.write("df_full (Master) - Head:", df_full.head())
+        st.write("df_full Dates:", df_full['date'].tolist()[:5])
+    with c_d2:
+        st.write("df_region (Station) - Head:", df_region.head())
+        st.write("df_region Dates:", df_region['date'].tolist()[:5])
+        
+    st.write("Checking match for first 5 rows:")
+    for k in range(min(5, len(df_region))):
+        d_val = df_region.iloc[k]['date']
+        in_full = d_val in df_full_lookup.index
+        st.write(f"Date: {d_val} | In df_full: {in_full}")
+
 for i in range(start_idx, end_idx):
     row = df_region.iloc[i]
     date_val = row['date']
@@ -373,7 +392,7 @@ for i in range(start_idx, end_idx):
     all_days_data.append({'date': row['date'], 'source': src_str, 'combos': combos, 'index': i})
 
 if not all_days_data:
-    st.warning("⚠️ Không có dữ liệu")
+    st.warning("⚠️ Không có dữ liệu. Vui lòng kiểm tra phần Debug ở trên để biết nguyên nhân.")
 else:
     st.markdown("### 📋 Bảng Theo Dõi")
     
