@@ -4,6 +4,8 @@ import logic
 import data_fetcher
 import concurrent.futures
 from datetime import datetime, timedelta
+import importlib
+importlib.reload(data_fetcher)
 
 # --- CẤU HÌNH ---
 st.set_page_config(
