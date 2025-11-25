@@ -285,18 +285,23 @@ else:
     c3, c4, c5, c6, c7 = st.columns([1, 1.5, 1, 1.5, 1.5])
     
     # Dropdown Thứ
-    weekdays = ["Chủ Nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"]
+    weekdays = ["Tất cả", "Chủ Nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"]
     selected_day = c3.selectbox("Thứ:", weekdays)
     
     # Dropdown Đài (dựa trên Miền và Thứ)
-    stations = data_fetcher.get_stations_by_day(region, selected_day)
-    if not stations:
-        st.error(f"⚠️ Không có đài nào mở thưởng vào {selected_day} ở {region}")
-        st.stop()
-    
-    # Thêm tùy chọn "Tất cả" vào đầu danh sách
-    station_options = ["Tất cả"] + stations
-    selected_station = c4.selectbox("Đài:", station_options)
+    if selected_day == "Tất cả":
+        # Nếu chọn tất cả các thứ, tự động chọn tất cả các đài
+        selected_station = "Tất cả"
+        c4.info("📌 Tự động chọn tất cả các đài")
+    else:
+        stations = data_fetcher.get_stations_by_day(region, selected_day)
+        if not stations:
+            st.error(f"⚠️ Không có đài nào mở thưởng vào {selected_day} ở {region}")
+            st.stop()
+        
+        # Thêm tùy chọn "Tất cả" vào đầu danh sách
+        station_options = ["Tất cả"] + stations
+        selected_station = c4.selectbox("Đài:", station_options)
     
     # Dropdown Giải
     prize_mode = c5.selectbox("Giải:", ["Đặc Biệt", "Giải Nhất"])
@@ -368,18 +373,22 @@ else:
             df_check_source = pd.DataFrame(grouped_data).sort_values('date', ascending=False)
             
             # Filter cho hiển thị (chỉ lấy những ngày đúng Thứ đã chọn)
-            WEEKDAY_MAP = {
-                "Thứ 2": 0, "Thứ 3": 1, "Thứ 4": 2, "Thứ 5": 3, "Thứ 6": 4, "Thứ 7": 5, "Chủ Nhật": 6
-            }
-            target_weekday = WEEKDAY_MAP.get(selected_day)
-            
-            def is_target_day(date_str):
-                try:
-                    return datetime.strptime(date_str, "%d/%m/%Y").weekday() == target_weekday
-                except:
-                    return False
-            
-            df_display = df_check_source[df_check_source['date'].apply(is_target_day)].copy()
+            if selected_day == "Tất cả":
+                # Hiển thị tất cả các ngày
+                df_display = df_check_source.copy()
+            else:
+                WEEKDAY_MAP = {
+                    "Thứ 2": 0, "Thứ 3": 1, "Thứ 4": 2, "Thứ 5": 3, "Thứ 6": 4, "Thứ 7": 5, "Chủ Nhật": 6
+                }
+                target_weekday = WEEKDAY_MAP.get(selected_day)
+                
+                def is_target_day(date_str):
+                    try:
+                        return datetime.strptime(date_str, "%d/%m/%Y").weekday() == target_weekday
+                    except:
+                        return False
+                
+                df_display = df_check_source[df_check_source['date'].apply(is_target_day)].copy()
             
     else:
         # Load dữ liệu cho đài đã chọn
