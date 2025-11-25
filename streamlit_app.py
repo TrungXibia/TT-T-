@@ -370,7 +370,12 @@ else:
                 if day_results:
                     grouped_data.append({'date': date, 'results': day_results})
             
-            df_check_source = pd.DataFrame(grouped_data).sort_values('date', ascending=False)
+            df_check_source = pd.DataFrame(grouped_data)
+            
+            # QUAN TRỌNG: Chuyển date string sang datetime để sort đúng
+            df_check_source['date_obj'] = pd.to_datetime(df_check_source['date'], format='%d/%m/%Y')
+            df_check_source = df_check_source.sort_values('date_obj', ascending=False)
+            df_check_source = df_check_source.drop(columns=['date_obj'])  # Xóa cột tạm
             
             # Debug: Show data info
             with st.expander("🐞 Thông tin dữ liệu"):
