@@ -783,13 +783,48 @@ else:
         misses = []  # Vị trí các lần không trúng
         
         for k in range(1, num_cols_this_row + 1):
-            idx = i - k
-            if idx >= 0 and idx >= backtest_offset:
-                val_res = df_region.iloc[idx][col_comp]
-                if val_res in combos:
-                    hits.append(k)
-                else:
-                    misses.append(k)
+            check_results = []
+            
+            if selected_station == "Tất cả" and region != "Miền Bắc":
+                # Use date-based check for All Stations
+                try:
+                    current_date_obj = datetime.strptime(date, "%d/%m/%Y")
+                    check_date_obj = current_date_obj + timedelta(days=k)
+                    check_date_str = check_date_obj.strftime("%d/%m/%Y")
+                    
+                    if check_date_str in check_source_lookup.index:
+                         check_row = check_source_lookup.loc[check_date_str]
+                         if isinstance(check_row, pd.DataFrame): check_row = check_row.iloc[0]
+                         res_list = check_row.get('results', [])
+                         if isinstance(res_list, list):
+                             check_results = res_list
+                except:
+                    pass
+            else:
+                # Use index-based check for single station/Miền Bắc
+                idx = i - k
+                if idx >= 0 and idx >= backtest_offset:
+                    check_row = df_region.iloc[idx]
+                    if region == "Miền Bắc":
+                        val = str(check_row.get(col_comp, ""))
+                        if val and val != "nan":
+                            check_results.append({'station': 'XSMB', 'val': val})
+                    else:
+                        res_list = check_row.get('results', [])
+                        if isinstance(res_list, list):
+                            check_results = res_list
+            
+            # Check if any result matches
+            is_hit = False
+            for res in check_results:
+                if res['val'] in combos:
+                    is_hit = True
+                    break
+            
+            if is_hit:
+                hits.append(k)
+            elif check_results:  # Only count as miss if there was data to check
+                misses.append(k)
         
         # Tính toán chu kỳ và nhận định
         total_checks = len(hits) + len(misses)
