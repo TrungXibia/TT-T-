@@ -84,24 +84,25 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* RESPONSIVE TABLE */
+    /* VERTICAL TRACKING TABLE */
     .table-wrapper {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
-        margin: 5px 0;
+        margin: 10px 0;
         border-radius: 6px;
         box-shadow: 0 1px 4px rgba(0,0,0,0.1);
     }
     
-    .responsive-table {
+    .tracking-table {
         border-collapse: collapse;
         width: 100%;
+        max-width: 650px;
+        margin: 0 auto;
         font-size: 11px;
-        min-width: 500px;
     }
     
-    .responsive-table th {
-        padding: 4px 2px;
+    .tracking-table th {
+        padding: 6px 4px;
         border: 1px solid #34495e;
         background-color: #2c3e50;
         color: white;
@@ -110,26 +111,73 @@ st.markdown("""
         position: sticky;
         top: 0;
         z-index: 10;
-        font-size: 10px;
+        font-size: 11px;
+        font-weight: 600;
     }
     
-    .responsive-table td {
-        padding: 4px 2px;
+    .tracking-table td {
+        padding: 8px 4px;
         border: 1px solid #dee2e6;
         text-align: center;
-        font-size: 10px;
+        font-size: 13px;
+    }
+    
+    .tracking-table td.moc-col {
+        font-weight: bold;
+        background-color: #f8f9fa;
+        color: #2c3e50;
+        font-size: 14px;
+    }
+    
+    .cell-hit {
+        background-color: #28a745 !important;
+        color: white;
+        font-weight: bold;
+        font-size: 16px;
+    }
+    
+    .cell-miss {
+        background-color: #dc3545 !important;
+        color: white;
+        font-size: 14px;
+    }
+    
+    .day-header {
+        background-color: #17a2b8;
+        color: white;
+        padding: 8px;
+        border-radius: 4px;
+        margin: 15px 0 5px 0;
+        font-weight: 600;
+        text-align: center;
     }
     
     /* Mobile optimization */
     @media (max-width: 768px) {
-        .responsive-table {
+        .tracking-table {
             font-size: 9px;
-            min-width: 400px;
+            max-width: 100%;
         }
-        .responsive-table th,
-        .responsive-table td {
-            padding: 3px 1px;
+        .tracking-table th {
+            padding: 4px 2px;
             font-size: 9px;
+        }
+        .tracking-table td {
+            padding: 6px 2px;
+            font-size: 11px;
+        }
+        .tracking-table td.moc-col {
+            font-size: 12px;
+        }
+        .cell-hit {
+            font-size: 13px;
+        }
+        .cell-miss {
+            font-size: 11px;
+        }
+        .day-header {
+            font-size: 11px;
+            padding: 6px;
         }
         [data-testid="column"] {
             padding: 0 0.1rem !important;
@@ -434,116 +482,112 @@ if not all_days_data:
 else:
     st.markdown("### 📋 Bảng Theo Dõi")
     
-    # Wrapper div cho responsive
-    table_html = "<div class='table-wrapper'>"
-    table_html += "<table class='responsive-table'><tr>"
-    table_html += "<th>Ngày</th>"
-    table_html += "<th>Giải</th>"
-    table_html += "<th>Dàn nhị hợp</th>"
-    table_html += "<th>Mức</th>"
-    
-    num_days = len(all_days_data)
-    for k in range(1, num_days + 1):
-        table_html += f"<th>N{k}</th>"
-    table_html += "</tr>"
+    # Giới hạn số cột tối đa để tránh vỡ khung trên mobile
+    MAX_COLS = 10
     
     # Lookup for verification
     check_source_lookup = df_check_source.set_index('date') if df_check_source is not None and not df_check_source.empty else pd.DataFrame()
     
+    # Tạo 1 bảng duy nhất dạng tam giác
+    # Mỗi dòng = 1 mốc (số từ các dàn)
+    # Tạo danh sách tất cả các mốc với thông tin ngày
+    all_mocs = []
     for row_idx, day_data in enumerate(all_days_data):
-        date, source, combos, i, day_results = day_data['date'], day_data['source'], day_data['combos'], day_data['index'], day_data['results']
-        dan_str = " ".join(combos[:15]) + ("..." if len(combos) > 15 else "")
-        row_bg = "#f8f9fa" if row_idx % 2 == 0 else "#ffffff"
-        table_html += f"<tr style='background-color: {row_bg};'><td style='font-weight: bold; color: #2c3e50;'>{date}</td>"
-        table_html += f"<td style='color: #495057;'>{source}</td>"
-        table_html += f"<td style='font-size: 11px; color: #495057;'>{dan_str}</td>"
-        table_html += f"<td style='font-weight: 600; color: #2c3e50;'>{len(combos)}</td>"
+        date, source, combos, i = day_data['date'], day_data['source'], day_data['combos'], day_data['index']
+        for combo in sorted(combos):
+            all_mocs.append({
+                'combo': combo,
+                'date': date,
+                'source': source,
+                'row_idx': row_idx,
+                'i': i
+            })
+    
+    # Tạo bảng HTML
+    table_html = "<div class='table-wrapper'>"
+    table_html += "<table class='tracking-table'><thead><tr>"
+    table_html += "<th>Mốc</th>"
+    
+    # Header columns N1, N2, ... N10
+    for k in range(1, MAX_COLS + 1):
+        table_html += f"<th>N{k}</th>"
+    table_html += "</tr></thead><tbody>"
+    
+    # Render từng mốc
+    for moc_data in all_mocs:
+        combo = moc_data['combo']
+        date = moc_data['date']
+        row_idx = moc_data['row_idx']
+        i = moc_data['i']
         
-        # Check results for next N days
-        for k in range(1, num_days + 1):
-            cell_content = ""
-            cell_style = ""
-            check_results = []
-            
-            if selected_station == "Tất cả" and region != "Miền Bắc":
-                # Continuous Check: Date + k days
-                try:
-                    current_date_obj = datetime.strptime(date, "%d/%m/%Y")
-                    # Note: We want FUTURE results. 
-                    # If df is sorted DESC, "Future" means newer dates.
-                    # But "Nuôi" usually means we play for the next days relative to the prediction date.
-                    # So we check date + 1, date + 2.
-                    check_date_obj = current_date_obj + timedelta(days=k)
-                    check_date_str = check_date_obj.strftime("%d/%m/%Y")
-                    
-                    if check_date_str in check_source_lookup.index:
-                        check_row = check_source_lookup.loc[check_date_str]
-                        # Handle duplicates if any (though grouped by date shouldn't have duplicates)
-                        if isinstance(check_row, pd.DataFrame):
-                            check_row = check_row.iloc[0]
-                            
-                        res_list = check_row.get('results', [])
-                        if isinstance(res_list, list):
-                            check_results = res_list
-                except:
-                    pass
+        table_html += "<tr>"
+        # Cột Mốc: hiển thị số + ngày
+        table_html += f"<td class='moc-col'>{combo}<br><small style='font-size:9px;color:#6c757d;'>{date}</small></td>"
+        
+        # Số cột thực tế cho dòng này (dạng tam giác)
+        num_cols_this_row = min(row_idx + 1, MAX_COLS)
+        
+        # Check từng cột N1, N2, ...
+        for k in range(1, MAX_COLS + 1):
+            if k > num_cols_this_row:
+                # Ô trống (ngoài tam giác)
+                table_html += "<td style='background-color:#f8f9fa;border:none;'></td>"
             else:
-                # Index-based check (Next Draw)
-                # i is current index. i-k is index of k-th previous row (which is k-th future draw in DESC sort)
-                check_idx = i - k
-                if check_idx >= 0 and check_idx < len(df_region):
-                    check_row = df_region.iloc[check_idx]
-                    
-                    if region == "Miền Bắc":
-                        val = str(check_row.get(col_comp, ""))
-                        if val and val != "nan":
-                            check_results.append({'station': 'XSMB', 'val': val})
-                    else:
-                        res_list = check_row.get('results', [])
-                        if isinstance(res_list, list):
-                            check_results = res_list
-
-            # Compare and Format Cell
-            hit_stations = []
-            for res in check_results:
-                 if res['val'] in combos:
-                     hit_stations.append(res)
-            
-            if hit_stations:
-                cell_style = "background-color: #d4edda; color: #155724; font-weight: bold;"
-                display_strs = []
-                for h in hit_stations:
-                    st_name = h['station']
-                    if st_name == "XSMB": 
-                        st_name = ""
-                    else: 
-                        st_name = STATION_ABBR.get(st_name, st_name)  # Use abbreviation
-                        st_name = f" ({st_name})"
-                    display_strs.append(f"{h['val']}{st_name}")
-                cell_content = "<br>".join(display_strs)
-            else:
-                if check_results:
-                     display_strs = []
-                     # Limit display to avoid clutter
-                     limit_disp = 2 if len(check_results) > 2 else len(check_results)
-                     for res in check_results[:limit_disp]:
-                         st_name = res['station']
-                         if st_name == "XSMB": 
-                             st_name = ""
-                         else: 
-                             st_name = STATION_ABBR.get(st_name, st_name)  # Use abbreviation
-                             st_name = f" ({st_name})"
-                         display_strs.append(f"{res['val']}{st_name}")
-                     cell_content = "<br>".join(display_strs)
-                     if len(check_results) > limit_disp: cell_content += "..."
+                check_results = []
+                
+                if selected_station == "Tất cả" and region != "Miền Bắc":
+                    # Continuous Check: Date + k days
+                    try:
+                        current_date_obj = datetime.strptime(date, "%d/%m/%Y")
+                        check_date_obj = current_date_obj + timedelta(days=k)
+                        check_date_str = check_date_obj.strftime("%d/%m/%Y")
+                        
+                        if check_date_str in check_source_lookup.index:
+                            check_row = check_source_lookup.loc[check_date_str]
+                            if isinstance(check_row, pd.DataFrame):
+                                check_row = check_row.iloc[0]
+                                
+                            res_list = check_row.get('results', [])
+                            if isinstance(res_list, list):
+                                check_results = res_list
+                    except:
+                        pass
                 else:
-                     cell_content = "-"
-
-            table_html += f"<td style='{cell_style}; font-size: 11px; min-width: 60px;'>{cell_content}</td>"
+                    # Index-based check (Next Draw)
+                    check_idx = i - k
+                    if check_idx >= 0 and check_idx < len(df_region):
+                        check_row = df_region.iloc[check_idx]
+                        
+                        if region == "Miền Bắc":
+                            val = str(check_row.get(col_comp, ""))
+                            if val and val != "nan":
+                                check_results.append({'station': 'XSMB', 'val': val})
+                        else:
+                            res_list = check_row.get('results', [])
+                            if isinstance(res_list, list):
+                                check_results = res_list
+                
+                # Kiểm tra xem combo này có trúng không
+                is_hit = False
+                for res in check_results:
+                    if res['val'] == combo:
+                        is_hit = True
+                        break
+                
+                # Render cell
+                if is_hit:
+                    table_html += "<td class='cell-hit'>✓</td>"
+                elif check_results:  # Có dữ liệu nhưng không trúng
+                    table_html += "<td class='cell-miss'>−</td>"
+                else:  # Không có dữ liệu
+                    table_html += "<td>−</td>"
+        
         table_html += "</tr>"
     
-    table_html += "</table></div>"
+    table_html += "</tbody></table></div>"
     st.markdown(table_html, unsafe_allow_html=True)
+    
+    # Divider sau bảng
     st.markdown("---")
     st.subheader("📊 Thống kê")
     total_days, total_checks, total_hits = len(all_days_data), 0, 0
