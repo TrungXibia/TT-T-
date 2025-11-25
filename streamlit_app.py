@@ -113,7 +113,7 @@ st.markdown("""
         z-index: 10;
         font-size: 11px;
         font-weight: 600;
-        width: 30px;
+        width: 20px;
     }
     
     .tracking-table td {
@@ -121,7 +121,7 @@ st.markdown("""
         border: 1px solid #dee2e6;
         text-align: center;
         font-size: 10px;
-        width: 30px;
+        width: 20px;
     }
     
     .tracking-table td.moc-col {
@@ -130,7 +130,7 @@ st.markdown("""
         color: #2c3e50;
         font-size: 11px;
         padding: 2px 1px;
-        width: 35px;
+        width: 25px;
     }
     
     .cell-hit {
