@@ -3,6 +3,7 @@ import pandas as pd
 import logic
 import data_fetcher
 import concurrent.futures
+from datetime import datetime, timedelta
 
 # --- CẤU HÌNH ---
 st.set_page_config(
@@ -314,18 +315,24 @@ if backtest_offset > 0:
     st.info(f"🔍 Backtest: Từ {backtest_offset} ngày trước")
 
 # === LOAD DỮ LIỆU ===
+df_display = None
+df_check_source = None
+
 if region == "Miền Bắc":
     # Sử dụng dữ liệu df_full đã load sẵn từ trước
-    df_region = df_full
+    df_display = df_full
+    df_check_source = df_full
 else:
     # Load dữ liệu từ API
     if selected_station == "Tất cả":
-        # Load tất cả các đài trong ngày
-        with st.spinner(f"🔄 Đang tải dữ liệu tất cả các đài ({', '.join(stations)})..."):
+        # Load tất cả các đài trong MIỀN (để có full data cho check liên tục)
+        all_stations = data_fetcher.get_all_stations_in_region(region)
+        
+        with st.spinner(f"🔄 Đang tải dữ liệu toàn bộ {region} ({len(all_stations)} đài)..."):
             all_station_data = []
             # Tải song song
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future_to_station = {executor.submit(data_fetcher.fetch_station_data, s, days_fetch): s for s in stations}
+                future_to_station = {executor.submit(data_fetcher.fetch_station_data, s, days_fetch): s for s in all_stations}
                 for future in concurrent.futures.as_completed(future_to_station):
                     station_name = future_to_station[future]
                     try:
@@ -344,13 +351,9 @@ else:
             # Chuyển đổi sang DataFrame và gom nhóm theo ngày
             df_temp = pd.DataFrame(all_station_data)
             
-            # Gom nhóm theo ngày, tạo list các kết quả
-            # Chúng ta cần giữ lại thông tin đài nào có kết quả nào
-            # Cấu trúc mới: date | results (list of dicts: {station, val})
-            
+            # Gom nhóm theo ngày (Master Data cho Verification)
             grouped_data = []
             for date, group in df_temp.groupby('date'):
-                # Gom tất cả kết quả của ngày này lại
                 day_results = []
                 for _, row in group.iterrows():
                     val = row.get(col_comp, "")
@@ -360,7 +363,21 @@ else:
                 if day_results:
                     grouped_data.append({'date': date, 'results': day_results})
             
-            df_region = pd.DataFrame(grouped_data).sort_values('date', ascending=False)
+            df_check_source = pd.DataFrame(grouped_data).sort_values('date', ascending=False)
+            
+            # Filter cho hiển thị (chỉ lấy những ngày đúng Thứ đã chọn)
+            WEEKDAY_MAP = {
+                "Thứ 2": 0, "Thứ 3": 1, "Thứ 4": 2, "Thứ 5": 3, "Thứ 6": 4, "Thứ 7": 5, "Chủ Nhật": 6
+            }
+            target_weekday = WEEKDAY_MAP.get(selected_day)
+            
+            def is_target_day(date_str):
+                try:
+                    return datetime.strptime(date_str, "%d/%m/%Y").weekday() == target_weekday
+                except:
+                    return False
+            
+            df_display = df_check_source[df_check_source['date'].apply(is_target_day)].copy()
             
     else:
         # Load dữ liệu cho đài đã chọn
@@ -372,10 +389,13 @@ else:
                 st.stop()
             
             # Chuyển đổi sang DataFrame
-            # Chuẩn hóa cấu trúc để giống với "Tất cả" (mỗi ngày 1 list kết quả)
             df_temp = pd.DataFrame(station_data)
             df_temp['results'] = df_temp.apply(lambda x: [{'station': selected_station, 'val': x.get(col_comp, "")}], axis=1)
-            df_region = df_temp[['date', 'results']]
+            df_display = df_temp[['date', 'results']]
+            df_check_source = df_display # Với 1 đài thì nguồn check cũng là chính nó
+
+# Gán lại vào df_region để tương thích code phía dưới (df_region đóng vai trò là df_display)
+df_region = df_display
 
 
 all_days_data = []
@@ -464,6 +484,9 @@ else:
         table_html += f"<th>N{k}</th>"
     table_html += "</tr>"
     
+    # Lookup for verification
+    check_source_lookup = df_check_source.set_index('date') if df_check_source is not None and not df_check_source.empty else pd.DataFrame()
+    
     for row_idx, day_data in enumerate(all_days_data):
         date, source, combos, i, day_results = day_data['date'], day_data['source'], day_data['combos'], day_data['index'], day_data['results']
         dan_str = " ".join(combos[:15]) + ("..." if len(combos) > 15 else "")
@@ -475,36 +498,39 @@ else:
         
         # Check results for next N days
         for k in range(1, num_days + 1):
-            check_idx = i - k
             cell_content = ""
             cell_style = ""
+            check_results = []
             
-            if check_idx >= 0:
-                # Get results for the check date
-                # We need to find the data for date at check_idx
-                # Since all_days_data is built from df_region.iloc[start:end], 
-                # and we iterate i from start to end.
-                # Wait, check_idx is index in df_region.
-                # We need to access df_region to get results for past days?
-                # No, the table columns are N1, N2... meaning "Result of Day + 1", "Result of Day + 2" relative to current row?
-                # Usually "Nuôi" means we play this set for next N days.
-                # So we check results of date + 1, date + 2...
-                # But here the loop is iterating backwards or forwards?
-                # df_region is sorted desc? No, usually asc or desc.
-                # Let's check df_region sort order. Usually it's desc (newest first).
-                # If i is current day, i-1 is tomorrow (if desc).
-                
-                # Let's assume df_region is sorted DESC (Newest top).
-                # Then i is current. i-1 is NEWER (Tomorrow). i+1 is OLDER (Yesterday).
-                # "Nuôi" means we predict for FUTURE.
-                # So we look at i-1, i-2...
-                
-                if check_idx < len(df_region): # Should be valid index
-                     # Get results from df_region directly to be safe
+            if selected_station == "Tất cả" and region != "Miền Bắc":
+                # Continuous Check: Date + k days
+                try:
+                    current_date_obj = datetime.strptime(date, "%d/%m/%Y")
+                    # Note: We want FUTURE results. 
+                    # If df is sorted DESC, "Future" means newer dates.
+                    # But "Nuôi" usually means we play for the next days relative to the prediction date.
+                    # So we check date + 1, date + 2.
+                    check_date_obj = current_date_obj + timedelta(days=k)
+                    check_date_str = check_date_obj.strftime("%d/%m/%Y")
+                    
+                    if check_date_str in check_source_lookup.index:
+                        check_row = check_source_lookup.loc[check_date_str]
+                        # Handle duplicates if any (though grouped by date shouldn't have duplicates)
+                        if isinstance(check_row, pd.DataFrame):
+                            check_row = check_row.iloc[0]
+                            
+                        res_list = check_row.get('results', [])
+                        if isinstance(res_list, list):
+                            check_results = res_list
+                except:
+                    pass
+            else:
+                # Index-based check (Next Draw)
+                # i is current index. i-k is index of k-th previous row (which is k-th future draw in DESC sort)
+                check_idx = i - k
+                if check_idx >= 0 and check_idx < len(df_region):
                     check_row = df_region.iloc[check_idx]
                     
-                    # Extract results
-                    check_results = []
                     if region == "Miền Bắc":
                         val = str(check_row.get(col_comp, ""))
                         if val and val != "nan":
@@ -513,73 +539,87 @@ else:
                         res_list = check_row.get('results', [])
                         if isinstance(res_list, list):
                             check_results = res_list
-                    
-                    # Compare
-                    hit_stations = []
-                    for res in check_results:
-                         if res['val'] in combos:
-                             hit_stations.append(res)
-                    
-                    if hit_stations:
-                        cell_style = "background-color: #d4edda; color: #155724; font-weight: bold;"
-                        # Show matched value and station
-                        display_strs = []
-                        for h in hit_stations:
-                            st_name = h['station']
-                            # Abbreviate station name if needed or just show
-                            if st_name == "XSMB": st_name = ""
-                            else: st_name = f" ({st_name})"
-                            display_strs.append(f"{h['val']}{st_name}")
-                        cell_content = "<br>".join(display_strs)
-                    else:
-                        # Show first result or empty
-                        if check_results:
-                             # Just show the first value for reference, or all?
-                             # Showing all might be too much. Let's show first 1-2.
-                             display_strs = []
-                             for res in check_results[:2]:
-                                 st_name = res['station']
-                                 if st_name == "XSMB": st_name = ""
-                                 else: st_name = f" ({st_name})"
-                                 display_strs.append(f"{res['val']}{st_name}")
-                             cell_content = "<br>".join(display_strs)
-                             if len(check_results) > 2: cell_content += "..."
-                        else:
-                             cell_content = "-"
+
+            # Compare and Format Cell
+            hit_stations = []
+            for res in check_results:
+                 if res['val'] in combos:
+                     hit_stations.append(res)
+            
+            if hit_stations:
+                cell_style = "background-color: #d4edda; color: #155724; font-weight: bold;"
+                display_strs = []
+                for h in hit_stations:
+                    st_name = h['station']
+                    if st_name == "XSMB": st_name = ""
+                    else: st_name = f" ({st_name})"
+                    display_strs.append(f"{h['val']}{st_name}")
+                cell_content = "<br>".join(display_strs)
+            else:
+                if check_results:
+                     display_strs = []
+                     # Limit display to avoid clutter
+                     limit_disp = 2 if len(check_results) > 2 else len(check_results)
+                     for res in check_results[:limit_disp]:
+                         st_name = res['station']
+                         if st_name == "XSMB": st_name = ""
+                         else: st_name = f" ({st_name})"
+                         display_strs.append(f"{res['val']}{st_name}")
+                     cell_content = "<br>".join(display_strs)
+                     if len(check_results) > limit_disp: cell_content += "..."
+                else:
+                     cell_content = "-"
 
             table_html += f"<td style='{cell_style}; font-size: 11px; min-width: 60px;'>{cell_content}</td>"
         table_html += "</tr>"
     
     table_html += "</table></div>"
     st.markdown(table_html, unsafe_allow_html=True)
-        
     st.markdown("---")
     st.subheader("📊 Thống kê")
     total_days, total_checks, total_hits = len(all_days_data), 0, 0
     for row_idx, day_data in enumerate(all_days_data):
-        combos, i = day_data['combos'], day_data['index']
+        combos, i, date = day_data['combos'], day_data['index'], day_data['date']
         for k in range(1, row_idx + 2):
-            idx = i - k
-            # Chỉ tính nếu idx >= backtest_offset (không tính "tương lai")
-            if idx >= 0 and idx >= backtest_offset:
+            is_valid_check = False
+            check_results = []
+            
+            if selected_station == "Tất cả" and region != "Miền Bắc":
+                try:
+                    current_date_obj = datetime.strptime(date, "%d/%m/%Y")
+                    check_date_obj = current_date_obj + timedelta(days=k)
+                    check_date_str = check_date_obj.strftime("%d/%m/%Y")
+                    
+                    if check_date_str in check_source_lookup.index:
+                         check_row = check_source_lookup.loc[check_date_str]
+                         if isinstance(check_row, pd.DataFrame): check_row = check_row.iloc[0]
+                         res_list = check_row.get('results', [])
+                         if isinstance(res_list, list):
+                             check_results = res_list
+                         is_valid_check = True
+                except:
+                    pass
+            else:
+                idx = i - k
+                if idx >= 0 and idx >= backtest_offset:
+                    is_valid_check = True
+                    check_row = df_region.iloc[idx]
+                    if region == "Miền Bắc":
+                        val = str(check_row.get(col_comp, ""))
+                        if val and val != "nan":
+                            check_results.append({'station': 'XSMB', 'val': val})
+                    else:
+                        res_list = check_row.get('results', [])
+                        if isinstance(res_list, list):
+                            check_results = res_list
+
+            if is_valid_check:
                 total_checks += 1
-                
-                # Check hit
-                check_row = df_region.iloc[idx]
                 is_hit = False
-                
-                if region == "Miền Bắc":
-                    val = str(check_row.get(col_comp, ""))
-                    if val and val != "nan" and val in combos:
+                for res in check_results:
+                    if res['val'] in combos:
                         is_hit = True
-                else:
-                    res_list = check_row.get('results', [])
-                    if isinstance(res_list, list):
-                        for res in res_list:
-                            if res['val'] in combos:
-                                is_hit = True
-                                break
-                
+                        break
                 if is_hit:
                     total_hits += 1
     
@@ -593,10 +633,7 @@ else:
     # === TỔNG HỢP DÀN CHƯA RA ===
     st.markdown("---")
     st.subheader("🎯 Tổng hợp Dàn Chưa Ra")
-    st.caption("Các dàn nhị hợp chưa ra (chưa trúng số nào)")
     
-    # Thu thập dữ liệu theo ngày - chỉ những dàn HOÀN TOÀN chưa ra
-    from datetime import datetime
     pending_by_date = []
     
     for row_idx, day_data in enumerate(all_days_data):
@@ -607,26 +644,42 @@ else:
         hit_numbers = set()
         
         # Kiểm tra xem có số nào trong dàn đã trúng chưa (chỉ xét dữ liệu lịch sử)
-        # Kiểm tra xem có số nào trong dàn đã trúng chưa (chỉ xét dữ liệu lịch sử)
         for k in range(1, num_cols_this_row + 1):
-            idx = i - k
-            if idx >= 0 and idx >= backtest_offset:
-                check_row = df_region.iloc[idx]
-                
-                if region == "Miền Bắc":
-                    val_res = str(check_row.get(col_comp, ""))
-                    if val_res and val_res != "nan" and val_res in combos:
-                        hit_numbers.add(val_res)
-                else:
-                    res_list = check_row.get('results', [])
-                    if isinstance(res_list, list):
-                        for res in res_list:
-                            if res['val'] in combos:
-                                hit_numbers.add(res['val'])
+            check_results = []
+            
+            if selected_station == "Tất cả" and region != "Miền Bắc":
+                try:
+                    current_date_obj = datetime.strptime(date, "%d/%m/%Y")
+                    check_date_obj = current_date_obj + timedelta(days=k)
+                    check_date_str = check_date_obj.strftime("%d/%m/%Y")
+                    
+                    if check_date_str in check_source_lookup.index:
+                         check_row = check_source_lookup.loc[check_date_str]
+                         if isinstance(check_row, pd.DataFrame): check_row = check_row.iloc[0]
+                         res_list = check_row.get('results', [])
+                         if isinstance(res_list, list):
+                             check_results = res_list
+                except:
+                    pass
+            else:
+                idx = i - k
+                if idx >= 0 and idx >= backtest_offset:
+                    check_row = df_region.iloc[idx]
+                    if region == "Miền Bắc":
+                        val = str(check_row.get(col_comp, ""))
+                        if val and val != "nan":
+                            check_results.append({'station': 'XSMB', 'val': val})
+                    else:
+                        res_list = check_row.get('results', [])
+                        if isinstance(res_list, list):
+                            check_results = res_list
+            
+            for res in check_results:
+                if res['val'] in combos:
+                    hit_numbers.add(res['val'])
         
         # Nếu CHƯA có số nào trúng (hit_numbers rỗng) thì dàn này chưa ra
         if not hit_numbers:
-            # Parse date để lấy thứ
             try:
                 date_obj = datetime.strptime(date, "%d/%m/%Y")
                 weekday_names = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"]
