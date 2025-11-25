@@ -291,7 +291,9 @@ else:
         st.error(f"⚠️ Không có đài nào mở thưởng vào {selected_day} ở {region}")
         st.stop()
     
-    selected_station = c4.selectbox("Đài:", stations)
+    # Thêm tùy chọn "Tất cả" vào đầu danh sách
+    station_options = ["Tất cả"] + stations
+    selected_station = c4.selectbox("Đài:", station_options)
     
     # Dropdown Giải
     prize_mode = c5.selectbox("Giải:", ["Đặc Biệt", "Giải Nhất"])
@@ -316,16 +318,64 @@ if region == "Miền Bắc":
     # Sử dụng dữ liệu df_full đã load sẵn từ trước
     df_region = df_full
 else:
-    # Load dữ liệu từ API cho đài đã chọn
-    with st.spinner(f"🔄 Đang tải dữ liệu {selected_station}..."):
-        station_data = data_fetcher.fetch_station_data(selected_station, total_days=days_fetch)
-        
-        if not station_data:
-            st.error(f"⚠️ Không thể tải dữ liệu cho {selected_station}")
-            st.stop()
-        
-        # Chuyển đổi sang DataFrame
-        df_region = pd.DataFrame(station_data)
+    # Load dữ liệu từ API
+    if selected_station == "Tất cả":
+        # Load tất cả các đài trong ngày
+        with st.spinner(f"🔄 Đang tải dữ liệu tất cả các đài ({', '.join(stations)})..."):
+            all_station_data = []
+            # Tải song song
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future_to_station = {executor.submit(data_fetcher.fetch_station_data, s, days_fetch): s for s in stations}
+                for future in concurrent.futures.as_completed(future_to_station):
+                    station_name = future_to_station[future]
+                    try:
+                        data = future.result()
+                        # Thêm tên đài vào mỗi dòng dữ liệu
+                        for item in data:
+                            item['station'] = station_name
+                        all_station_data.extend(data)
+                    except Exception as exc:
+                        st.error(f"Lỗi tải đài {station_name}: {exc}")
+            
+            if not all_station_data:
+                st.error("⚠️ Không thể tải dữ liệu")
+                st.stop()
+            
+            # Chuyển đổi sang DataFrame và gom nhóm theo ngày
+            df_temp = pd.DataFrame(all_station_data)
+            
+            # Gom nhóm theo ngày, tạo list các kết quả
+            # Chúng ta cần giữ lại thông tin đài nào có kết quả nào
+            # Cấu trúc mới: date | results (list of dicts: {station, val})
+            
+            grouped_data = []
+            for date, group in df_temp.groupby('date'):
+                # Gom tất cả kết quả của ngày này lại
+                day_results = []
+                for _, row in group.iterrows():
+                    val = row.get(col_comp, "")
+                    if val:
+                        day_results.append({'station': row['station'], 'val': val})
+                
+                if day_results:
+                    grouped_data.append({'date': date, 'results': day_results})
+            
+            df_region = pd.DataFrame(grouped_data).sort_values('date', ascending=False)
+            
+    else:
+        # Load dữ liệu cho đài đã chọn
+        with st.spinner(f"🔄 Đang tải dữ liệu {selected_station}..."):
+            station_data = data_fetcher.fetch_station_data(selected_station, total_days=days_fetch)
+            
+            if not station_data:
+                st.error(f"⚠️ Không thể tải dữ liệu cho {selected_station}")
+                st.stop()
+            
+            # Chuyển đổi sang DataFrame
+            # Chuẩn hóa cấu trúc để giống với "Tất cả" (mỗi ngày 1 list kết quả)
+            df_temp = pd.DataFrame(station_data)
+            df_temp['results'] = df_temp.apply(lambda x: [{'station': selected_station, 'val': x.get(col_comp, "")}], axis=1)
+            df_region = df_temp[['date', 'results']]
 
 
 all_days_data = []
@@ -368,9 +418,33 @@ for i in range(start_idx, end_idx):
     if not src_str or src_str == "nan": 
         continue
     
+    # ... (previous code)
+    
     digits = set(src_str)
     combos = sorted({a+b for a in digits for b in digits})
-    all_days_data.append({'date': row['date'], 'source': src_str, 'combos': combos, 'index': i})
+    
+    # Store results for this date (for comparison later)
+    # If Miền Bắc: result is in row[col_comp]
+    # If Miền Nam/Trung: result is in row['results'] (list of dicts)
+    
+    date_results = []
+    if region == "Miền Bắc":
+        val = str(row.get(col_comp, ""))
+        if val and val != "nan":
+            date_results.append({'station': 'XSMB', 'val': val})
+    else:
+        # row['results'] is already a list of dicts {station, val}
+        res_list = row.get('results', [])
+        if isinstance(res_list, list):
+            date_results = res_list
+            
+    all_days_data.append({
+        'date': row['date'], 
+        'source': src_str, 
+        'combos': combos, 
+        'index': i,
+        'results': date_results
+    })
 
 if not all_days_data:
     st.warning("⚠️ Không có dữ liệu")
@@ -391,7 +465,7 @@ else:
     table_html += "</tr>"
     
     for row_idx, day_data in enumerate(all_days_data):
-        date, source, combos, i = day_data['date'], day_data['source'], day_data['combos'], day_data['index']
+        date, source, combos, i, day_results = day_data['date'], day_data['source'], day_data['combos'], day_data['index'], day_data['results']
         dan_str = " ".join(combos[:15]) + ("..." if len(combos) > 15 else "")
         row_bg = "#f8f9fa" if row_idx % 2 == 0 else "#ffffff"
         table_html += f"<tr style='background-color: {row_bg};'><td style='font-weight: bold; color: #2c3e50;'>{date}</td>"
@@ -399,28 +473,86 @@ else:
         table_html += f"<td style='font-size: 11px; color: #495057;'>{dan_str}</td>"
         table_html += f"<td style='font-weight: 600; color: #2c3e50;'>{len(combos)}</td>"
         
-        num_cols_this_row = row_idx + 1
-        for k in range(1, num_cols_this_row + 1):
-            idx = i - k
-            cell_val, bg_color, text_color = "", "#ecf0f1", "#7f8c8d"
+        # Check results for next N days
+        for k in range(1, num_days + 1):
+            check_idx = i - k
+            cell_content = ""
+            cell_style = ""
             
-            # Chỉ hiển thị kết quả nếu idx >= backtest_offset (không xem "tương lai")
-            if idx >= 0 and idx >= backtest_offset:
-                val_res = df_region.iloc[idx][col_comp]
-                if val_res in combos:
-                    cell_val, bg_color, text_color = "✅", "#27ae60", "white"
-                else:
-                    cell_val, bg_color, text_color = "--", "#e74c3c", "white"
-            table_html += f"<td style='background-color: {bg_color}; color: {text_color}; font-weight: bold;'>{cell_val}</td>"
-        
-        for _ in range(num_days - row_idx - 1):
-            table_html += "<td style='background-color: #ecf0f1;'></td>"
+            if check_idx >= 0:
+                # Get results for the check date
+                # We need to find the data for date at check_idx
+                # Since all_days_data is built from df_region.iloc[start:end], 
+                # and we iterate i from start to end.
+                # Wait, check_idx is index in df_region.
+                # We need to access df_region to get results for past days?
+                # No, the table columns are N1, N2... meaning "Result of Day + 1", "Result of Day + 2" relative to current row?
+                # Usually "Nuôi" means we play this set for next N days.
+                # So we check results of date + 1, date + 2...
+                # But here the loop is iterating backwards or forwards?
+                # df_region is sorted desc? No, usually asc or desc.
+                # Let's check df_region sort order. Usually it's desc (newest first).
+                # If i is current day, i-1 is tomorrow (if desc).
+                
+                # Let's assume df_region is sorted DESC (Newest top).
+                # Then i is current. i-1 is NEWER (Tomorrow). i+1 is OLDER (Yesterday).
+                # "Nuôi" means we predict for FUTURE.
+                # So we look at i-1, i-2...
+                
+                if check_idx < len(df_region): # Should be valid index
+                     # Get results from df_region directly to be safe
+                    check_row = df_region.iloc[check_idx]
+                    
+                    # Extract results
+                    check_results = []
+                    if region == "Miền Bắc":
+                        val = str(check_row.get(col_comp, ""))
+                        if val and val != "nan":
+                            check_results.append({'station': 'XSMB', 'val': val})
+                    else:
+                        res_list = check_row.get('results', [])
+                        if isinstance(res_list, list):
+                            check_results = res_list
+                    
+                    # Compare
+                    hit_stations = []
+                    for res in check_results:
+                         if res['val'] in combos:
+                             hit_stations.append(res)
+                    
+                    if hit_stations:
+                        cell_style = "background-color: #d4edda; color: #155724; font-weight: bold;"
+                        # Show matched value and station
+                        display_strs = []
+                        for h in hit_stations:
+                            st_name = h['station']
+                            # Abbreviate station name if needed or just show
+                            if st_name == "XSMB": st_name = ""
+                            else: st_name = f" ({st_name})"
+                            display_strs.append(f"{h['val']}{st_name}")
+                        cell_content = "<br>".join(display_strs)
+                    else:
+                        # Show first result or empty
+                        if check_results:
+                             # Just show the first value for reference, or all?
+                             # Showing all might be too much. Let's show first 1-2.
+                             display_strs = []
+                             for res in check_results[:2]:
+                                 st_name = res['station']
+                                 if st_name == "XSMB": st_name = ""
+                                 else: st_name = f" ({st_name})"
+                                 display_strs.append(f"{res['val']}{st_name}")
+                             cell_content = "<br>".join(display_strs)
+                             if len(check_results) > 2: cell_content += "..."
+                        else:
+                             cell_content = "-"
+
+            table_html += f"<td style='{cell_style}; font-size: 11px; min-width: 60px;'>{cell_content}</td>"
         table_html += "</tr>"
     
     table_html += "</table></div>"
-    table_html += "<div class='scroll-hint'>👆 Vuốt ngang để xem thêm →</div>"
     st.markdown(table_html, unsafe_allow_html=True)
-    
+        
     st.markdown("---")
     st.subheader("📊 Thống kê")
     total_days, total_checks, total_hits = len(all_days_data), 0, 0
@@ -431,7 +563,24 @@ else:
             # Chỉ tính nếu idx >= backtest_offset (không tính "tương lai")
             if idx >= 0 and idx >= backtest_offset:
                 total_checks += 1
-                if df_region.iloc[idx][col_comp] in combos:
+                
+                # Check hit
+                check_row = df_region.iloc[idx]
+                is_hit = False
+                
+                if region == "Miền Bắc":
+                    val = str(check_row.get(col_comp, ""))
+                    if val and val != "nan" and val in combos:
+                        is_hit = True
+                else:
+                    res_list = check_row.get('results', [])
+                    if isinstance(res_list, list):
+                        for res in res_list:
+                            if res['val'] in combos:
+                                is_hit = True
+                                break
+                
+                if is_hit:
                     total_hits += 1
     
     hit_rate = round(total_hits / total_checks * 100, 1) if total_checks > 0 else 0
@@ -458,12 +607,22 @@ else:
         hit_numbers = set()
         
         # Kiểm tra xem có số nào trong dàn đã trúng chưa (chỉ xét dữ liệu lịch sử)
+        # Kiểm tra xem có số nào trong dàn đã trúng chưa (chỉ xét dữ liệu lịch sử)
         for k in range(1, num_cols_this_row + 1):
             idx = i - k
             if idx >= 0 and idx >= backtest_offset:
-                val_res = df_region.iloc[idx][col_comp]
-                if val_res in combos:
-                    hit_numbers.add(val_res)
+                check_row = df_region.iloc[idx]
+                
+                if region == "Miền Bắc":
+                    val_res = str(check_row.get(col_comp, ""))
+                    if val_res and val_res != "nan" and val_res in combos:
+                        hit_numbers.add(val_res)
+                else:
+                    res_list = check_row.get('results', [])
+                    if isinstance(res_list, list):
+                        for res in res_list:
+                            if res['val'] in combos:
+                                hit_numbers.add(res['val'])
         
         # Nếu CHƯA có số nào trúng (hit_numbers rỗng) thì dàn này chưa ra
         if not hit_numbers:
