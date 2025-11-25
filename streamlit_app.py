@@ -332,22 +332,38 @@ all_days_data = []
 start_idx = backtest_offset
 end_idx = min(backtest_offset + 20, len(df_region))
 
+# Tạo lookup dictionary cho df_full để tra cứu nhanh theo ngày
+df_full_lookup = df_full.set_index('date') if not df_full.empty else pd.DataFrame()
+
 for i in range(start_idx, end_idx):
     row = df_region.iloc[i]
-    src_str = ""
+    date_val = row['date']
     
+    # Xác định dòng dữ liệu nguồn (Source Row)
+    # Nếu là Miền Bắc thì chính là row hiện tại
+    # Nếu là Miền Nam/Trung thì phải tìm ngày tương ứng trong df_full
+    row_src = None
     if region == "Miền Bắc":
-        # Miền Bắc: Sử dụng Thần Tài hoặc Điện Toán
-        if src_mode == "Thần Tài": 
-            src_str = str(row.get('tt_number', ''))
-        elif src_mode == "Điện Toán": 
-            src_str = "".join(row.get('dt_numbers', []))
+        row_src = row
     else:
-        # Miền Nam/Trung: Sử dụng số từ giải đã chọn
-        if prize_mode == "Đặc Biệt":
-            src_str = str(row.get('db', ''))
-        else:  # Giải Nhất
-            src_str = str(row.get('g1', ''))
+        if date_val in df_full_lookup.index:
+            row_src = df_full_lookup.loc[date_val]
+            # Xử lý trường hợp trùng ngày (nếu có)
+            if isinstance(row_src, pd.DataFrame):
+                row_src = row_src.iloc[0]
+    
+    if row_src is None:
+        continue
+
+    src_str = ""
+    if src_mode == "Thần Tài": 
+        src_str = str(row_src.get('tt_number', ''))
+    elif src_mode == "Điện Toán": 
+        val = row_src.get('dt_numbers', [])
+        if isinstance(val, list):
+             src_str = "".join(val)
+        else:
+             src_str = str(val) if pd.notna(val) else ""
     
     if not src_str or src_str == "nan": 
         continue
