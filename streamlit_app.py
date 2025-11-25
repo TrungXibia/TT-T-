@@ -372,6 +372,15 @@ else:
             
             df_check_source = pd.DataFrame(grouped_data).sort_values('date', ascending=False)
             
+            # Debug: Show data info
+            with st.expander("🐞 Thông tin dữ liệu"):
+                st.write(f"**Số đài đã tải**: {len(all_stations)}")
+                st.write(f"**Tổng số bản ghi**: {len(all_station_data)}")
+                st.write(f"**Số ngày có dữ liệu**: {len(df_check_source)}")
+                if not df_check_source.empty:
+                    st.write(f"**Ngày mới nhất**: {df_check_source.iloc[0]['date']}")
+                    st.write(f"**Ngày cũ nhất**: {df_check_source.iloc[-1]['date']}")
+            
             # Filter cho hiển thị (chỉ lấy những ngày đúng Thứ đã chọn)
             if selected_day == "Tất cả":
                 # Hiển thị tất cả các ngày
