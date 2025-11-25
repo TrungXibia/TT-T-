@@ -259,11 +259,26 @@ df_show = df_full.head(days_show).copy()
 # === 🎯 DÀN NUÔI (MATRIX) ===
 st.title("🎯 DÀN NUÔI (MATRIX)")
 st.divider()
-c1, c2, c3, c4 = st.columns([1, 1, 1.5, 1.5])
+
+# Tạo 5 cột: Nguồn, Miền, So với, Khung nuôi, Backtest
+c1, c2, c3, c4, c5 = st.columns([1, 1, 1.5, 1.5, 1.5])
+
 src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán"])
-comp_mode = c2.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất"])
-check_range = c3.slider("Khung nuôi (ngày):", 1, 20, 7)
-backtest_mode = c4.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
+
+# Dropdown chọn Miền
+region = c2.selectbox("Miền:", ["Miền Bắc", "Miền Nam", "Miền Trung"])
+
+# Dropdown "So với" thay đổi theo Miền
+if region == "Miền Bắc":
+    comp_options = ["XSMB (ĐB)", "Giải Nhất"]
+elif region == "Miền Nam":
+    comp_options = ["XSMN (ĐB)", "Giải Nhất"]
+else:  # Miền Trung
+    comp_options = ["XSMT (ĐB)", "Giải Nhất"]
+
+comp_mode = c3.selectbox("So với:", comp_options)
+check_range = c4.slider("Khung nuôi (ngày):", 1, 20, 7)
+backtest_mode = c5.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
 
 # Tự động phân tích
 backtest_offset = 0
@@ -273,7 +288,15 @@ if backtest_mode != "Hiện tại":
 if backtest_offset > 0:
     st.info(f"🔍 Backtest: Từ {backtest_offset} ngày trước")
 
-col_comp = "xsmb_2so" if comp_mode == "XSMB (ĐB)" else "g1_2so"
+# Xác định cột so sánh dựa trên Miền và loại giải
+# Hiện tại chỉ có dữ liệu Miền Bắc, các miền khác sẽ cần thêm sau
+if region == "Miền Bắc":
+    col_comp = "xsmb_2so" if "ĐB" in comp_mode else "g1_2so"
+else:
+    # Placeholder cho Miền Nam và Miền Trung - cần thêm data fetcher
+    st.warning(f"⚠️ Chức năng {region} đang được phát triển. Hiện tại chỉ hỗ trợ Miền Bắc.")
+    col_comp = "xsmb_2so"  # Tạm thời dùng Miền Bắc
+
 
 all_days_data = []
 start_idx = backtest_offset
