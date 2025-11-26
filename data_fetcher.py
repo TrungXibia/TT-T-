@@ -158,9 +158,11 @@ def fetch_station_data(station_name: str, total_days: int = 60) -> List[Dict]:
                     "g8": prizes[8] if len(prizes) > 8 else "",  # Giải Tám
                 }
                 
-                # Extract 2-digit numbers (lô) from ĐB and G1
+                # Extract 2-digit numbers (lô) from ĐB, G1, G7, and G8
                 result["db_2so"] = result["db"][-2:] if result["db"] else ""
                 result["g1_2so"] = result["g1"][-2:] if result["g1"] else ""
+                result["g7_2so"] = result["g7"][-2:] if result["g7"] else ""
+                result["g8_2so"] = result["g8"][-2:] if result["g8"] else ""
                 
                 results.append(result)
                 
@@ -312,12 +314,12 @@ def _parse_congcuxoso(url: str, total_days: int) -> List[str]:
     
     return nums[:total_days]
 
-def fetch_xsmb_group(total_days: int) -> Tuple[List[str], List[str]]:
+def fetch_xsmb_group(total_days: int) -> Tuple[List[str], List[str], List[str]]:
     """
-    Fetch both ĐB and G1 in parallel for better performance.
+    Fetch ĐB, G1, and G7 in parallel for better performance.
     
     Returns:
-        Tuple of (ĐB numbers, G1 numbers)
+        Tuple of (ĐB numbers, G1 numbers, G7 numbers as list of 4 values)
     """
     with concurrent.futures.ThreadPoolExecutor() as executor:
         f1 = executor.submit(_parse_congcuxoso, 
@@ -326,4 +328,8 @@ def fetch_xsmb_group(total_days: int) -> Tuple[List[str], List[str]]:
         f2 = executor.submit(_parse_congcuxoso, 
                             "https://congcuxoso.com/MienBac/GiaiNhat/PhoiCauGiaiNhat/PhoiCauTuan5So.aspx", 
                             total_days)
-        return f1.result(), f2.result()
+        f3 = executor.submit(_parse_congcuxoso, 
+                            "https://congcuxoso.com/MienBac/GiaiBay/PhoiCauGiaiBay/PhoiCauTuan4So.aspx", 
+                            total_days)
+        return f1.result(), f2.result(), f3.result()
+
