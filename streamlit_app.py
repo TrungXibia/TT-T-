@@ -294,14 +294,19 @@ else:
         selected_station = c4.selectbox("Đài:", station_options)
     
     # Dropdown Giải
-    prize_mode = c5.selectbox("Giải:", ["ĐB", "G1"])
+    prize_mode = c5.selectbox("Giải:", ["ĐB", "G1", "G8"])
     
     # Khung nuôi và Backtest
     check_range = c6.slider("Khung:", 1, 20, 7)
     backtest_mode = c7.selectbox("Backtest:", ["Hiện tại", "Lùi 1", "Lùi 2", "Lùi 3", "Lùi 4", "Lùi 5"])
     
     # Xác định cột so sánh
-    col_comp = "db_2so" if prize_mode == "ĐB" else "g1_2so"
+    if prize_mode == "ĐB":
+        col_comp = "db_2so"
+    elif prize_mode == "G1":
+        col_comp = "g1_2so"
+    else:  # G8
+        col_comp = "g8_2so"
 
 # Tự động phân tích
 backtest_offset = 0
