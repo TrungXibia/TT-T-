@@ -96,7 +96,7 @@ st.markdown("""
     .tracking-table {
         border-collapse: collapse;
         width: 100%;
-        max-width: 650px;
+        max-width: 1200px;
         margin: 0 auto;
         font-size: 11px;
     }
@@ -509,7 +509,7 @@ else:
     st.markdown("### 📋 Bảng Theo Dõi")
     
     # Giới hạn số cột tối đa để tránh vỡ khung trên mobile
-    MAX_COLS = 10
+    MAX_COLS = 20
     
     # Lookup for verification
     check_source_lookup = df_check_source.set_index('date') if df_check_source is not None and not df_check_source.empty else pd.DataFrame()
