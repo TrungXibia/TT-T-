@@ -201,22 +201,21 @@ def get_master_data(num_days):
         
         dt = f_dt.result()
         tt = f_tt.result()
-        mb_db, mb_g1, mb_g7 = f_mb.result()
+        mb_db, mb_g1 = f_mb.result()
 
     # Xử lý khớp ngày (Quan trọng để không bị lệch)
     df_dt = pd.DataFrame(dt)
     df_tt = pd.DataFrame(tt)
     
     xsmb_rows = []
-    limit = min(len(dt), len(mb_db), len(mb_g1), len(mb_g7))
+    limit = min(len(dt), len(mb_db), len(mb_g1))
     for i in range(limit):
         xsmb_rows.append({
             "date": dt[i]["date"], # Dùng ngày của Điện Toán làm chuẩn
             "xsmb_full": mb_db[i],
             "xsmb_2so": mb_db[i][-2:],
             "g1_full": mb_g1[i],
-            "g1_2so": mb_g1[i][-2:],
-            "g7_4so": mb_g7[i][-4:] if mb_g7[i] else ""  # G7 có 4 số
+            "g1_2so": mb_g1[i][-2:]
         })
     df_xsmb = pd.DataFrame(xsmb_rows)
 
@@ -261,19 +260,14 @@ region = c2.selectbox("Miền:", ["Miền Bắc", "Miền Nam", "Miền Trung"])
 
 # Row 2: Thứ, Đài, Giải (cho Miền Nam/Trung) hoặc So với (cho Miền Bắc)
 if region == "Miền Bắc":
-    # Miền Bắc: Giữ nguyên logic cũ + thêm 4 giải 7
+    # Miền Bắc: Giữ nguyên logic cũ
     c3, c4, c5 = st.columns([1.5, 1.5, 1.5])
-    comp_mode = c3.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất", "4 Giải 7"])
+    comp_mode = c3.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất"])
     check_range = c4.slider("Khung nuôi (ngày):", 1, 20, 7)
     backtest_mode = c5.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
     
     # Xác định cột so sánh
-    if "ĐB" in comp_mode:
-        col_comp = "xsmb_2so"
-    elif "Nhất" in comp_mode:
-        col_comp = "g1_2so"
-    else:  # 4 Giải 7
-        col_comp = "g7_4so"
+    col_comp = "xsmb_2so" if "ĐB" in comp_mode else "g1_2so"
     selected_station = None
     
 else:
@@ -300,21 +294,14 @@ else:
         selected_station = c4.selectbox("Đài:", station_options)
     
     # Dropdown Giải
-    prize_mode = c5.selectbox("Giải:", ["ĐB", "G1", "G7", "G8"])
+    prize_mode = c5.selectbox("Giải:", ["ĐB", "G1"])
     
     # Khung nuôi và Backtest
     check_range = c6.slider("Khung:", 1, 20, 7)
     backtest_mode = c7.selectbox("Backtest:", ["Hiện tại", "Lùi 1", "Lùi 2", "Lùi 3", "Lùi 4", "Lùi 5"])
     
     # Xác định cột so sánh
-    if prize_mode == "ĐB":
-        col_comp = "db_2so"
-    elif prize_mode == "G1":
-        col_comp = "g1_2so"
-    elif prize_mode == "G7":
-        col_comp = "g7_2so"
-    else:  # G8
-        col_comp = "g8_2so"
+    col_comp = "db_2so" if prize_mode == "ĐB" else "g1_2so"
 
 # Tự động phân tích
 backtest_offset = 0
