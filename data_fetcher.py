@@ -313,18 +313,68 @@ def _parse_congcuxoso(url: str, total_days: int) -> List[str]:
     
     return nums[:total_days]
 
-def fetch_xsmb_group(total_days: int) -> Tuple[List[str], List[str]]:
+
+def fetch_xsmb_full(total_days: int) -> Tuple[List[str], List[str], List[List[str]]]:
     """
-    Fetch both ĐB and G1 in parallel for better performance.
+    Fetch ĐB, G1, and G7 from kqxs88.live API for Miền Bắc.
     
     Returns:
-        Tuple of (ĐB numbers, G1 numbers)
+        Tuple of (ĐB numbers, G1 numbers, G7 numbers)
+        G7 is a list of lists, where each inner list contains 4 numbers
     """
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        f1 = executor.submit(_parse_congcuxoso, 
-                            "https://congcuxoso.com/MienBac/DacBiet/PhoiCauDacBiet/PhoiCauTuan5So.aspx", 
-                            total_days)
-        f2 = executor.submit(_parse_congcuxoso, 
-                            "https://congcuxoso.com/MienBac/GiaiNhat/PhoiCauGiaiNhat/PhoiCauTuan5So.aspx", 
-                            total_days)
-        return f1.result(), f2.result()
+    url = f"https://www.kqxs88.live/api/front/open/lottery/history/list/game?limitNum={total_days}&gameCode=miba"
+    
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        if not data.get("success"):
+            logging.error("API returned error for Miền Bắc")
+            return [], [], []
+        
+        issue_list = data.get("t", {}).get("issueList", [])
+        
+        db_numbers = []
+        g1_numbers = []
+        g7_numbers = []
+        
+        for issue in issue_list[:total_days]:
+            detail_str = issue.get("detail", "")
+            
+            if not detail_str:
+                continue
+            
+            try:
+                # Parse detail JSON array
+                prizes = json.loads(detail_str)
+                
+                # prizes[0] = ĐB (5 digits)
+                # prizes[1] = G1 (5 digits)
+                # prizes[7] = G7 (4 numbers, comma-separated)
+                
+                db = prizes[0] if len(prizes) > 0 else ""
+                g1 = prizes[1] if len(prizes) > 1 else ""
+                g7_str = prizes[7] if len(prizes) > 7 else ""
+                
+                # Parse G7 (comma-separated: "68,12,40,09")
+                g7_list = []
+                if g7_str:
+                    g7_list = [num.strip().zfill(2) for num in g7_str.split(",")]
+                
+                db_numbers.append(db)
+                g1_numbers.append(g1)
+                g7_numbers.append(g7_list)
+                
+            except json.JSONDecodeError as e:
+                logging.error(f"Error parsing Miền Bắc detail: {e}")
+                continue
+        
+        return db_numbers, g1_numbers, g7_numbers
+        
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error fetching Miền Bắc data: {e}")
+        return [], [], []
+    except Exception as e:
+        logging.error(f"Unexpected error for Miền Bắc: {e}")
+        return [], [], []
