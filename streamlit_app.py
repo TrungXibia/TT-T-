@@ -282,7 +282,11 @@ def render_matrix_view(mode_3d=False):
     if region == "Miền Bắc":
         # Miền Bắc: Giữ nguyên logic cũ
         c3, c4, c5 = st.columns([1.5, 1.5, 1.5])
-        comp_mode = c3.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất", "Giải 7", "Giải 6"], key=f"comp_{mode_3d}")
+        
+        # Filter options for 3D mode (G7 is only 2 digits in MB)
+        mb_options = ["XSMB (ĐB)", "Giải Nhất", "Giải 6"] if mode_3d else ["XSMB (ĐB)", "Giải Nhất", "Giải 7", "Giải 6"]
+        comp_mode = c3.selectbox("So với:", mb_options, key=f"comp_{mode_3d}")
+        
         check_range = c4.slider("Khung nuôi (ngày):", 1, 20, 7, key=f"range_{mode_3d}")
         backtest_mode = c5.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"], key=f"back_{mode_3d}")
         
@@ -322,7 +326,9 @@ def render_matrix_view(mode_3d=False):
             selected_station = c4.selectbox("Đài:", station_options, key=f"st_{mode_3d}")
         
         # Dropdown Giải
-        prize_mode = c5.selectbox("Giải:", ["ĐB", "G1", "G8", "G7"], key=f"prz_{mode_3d}")
+        # Filter options for 3D mode (G8 is only 2 digits in MN/MT)
+        mn_options = ["ĐB", "G1", "G7"] if mode_3d else ["ĐB", "G1", "G8", "G7"]
+        prize_mode = c5.selectbox("Giải:", mn_options, key=f"prz_{mode_3d}")
         
         # Khung nuôi và Backtest
         check_range = c6.slider("Khung:", 1, 20, 7, key=f"range_{mode_3d}")
@@ -396,12 +402,20 @@ def render_matrix_view(mode_3d=False):
                     if day_results:
                         grouped_data.append({'date': date, 'results': day_results})
                 
+                if not grouped_data:
+                    st.warning(f"⚠️ Không tìm thấy dữ liệu so sánh ({col_comp}) cho {region}")
+                    st.stop()
+
                 df_check_source = pd.DataFrame(grouped_data)
                 
                 # QUAN TRỌNG: Chuyển date string sang datetime để sort đúng
-                df_check_source['date_obj'] = pd.to_datetime(df_check_source['date'], format='%d/%m/%Y')
-                df_check_source = df_check_source.sort_values('date_obj', ascending=False)
-                df_check_source = df_check_source.drop(columns=['date_obj'])  # Xóa cột tạm
+                if 'date' in df_check_source.columns:
+                    df_check_source['date_obj'] = pd.to_datetime(df_check_source['date'], format='%d/%m/%Y')
+                    df_check_source = df_check_source.sort_values('date_obj', ascending=False)
+                    df_check_source = df_check_source.drop(columns=['date_obj'])  # Xóa cột tạm
+                else:
+                    st.error("Lỗi cấu trúc dữ liệu")
+                    st.stop()
                 
                 # Filter cho hiển thị (chỉ lấy những ngày đúng Thứ đã chọn)
                 if selected_day == "Tất cả":
