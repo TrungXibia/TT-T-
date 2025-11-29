@@ -158,10 +158,11 @@ def fetch_station_data(station_name: str, total_days: int = 60) -> List[Dict]:
                     "g8": prizes[8] if len(prizes) > 8 else "",  # Giải Tám
                 }
                 
-                # Extract 2-digit numbers (lô) from ĐB, G1, and G8
+                # Extract 2-digit numbers (lô) from ĐB, G1, G8 and G7
                 result["db_2so"] = result["db"][-2:] if result["db"] else ""
                 result["g1_2so"] = result["g1"][-2:] if result["g1"] else ""
                 result["g8_2so"] = result["g8"][-2:] if result["g8"] else ""
+                result["g7_2so"] = result["g7"][-2:] if result["g7"] else ""
                 
                 results.append(result)
                 
@@ -314,13 +315,13 @@ def _parse_congcuxoso(url: str, total_days: int) -> List[str]:
     return nums[:total_days]
 
 
-def fetch_xsmb_full(total_days: int) -> Tuple[List[str], List[str], List[List[str]]]:
+def fetch_xsmb_full(total_days: int) -> Tuple[List[str], List[str], List[List[str]], List[List[str]]]:
     """
-    Fetch ĐB, G1, and G7 from kqxs88.live API for Miền Bắc.
+    Fetch ĐB, G1, G7 and G6 from kqxs88.live API for Miền Bắc.
     
     Returns:
-        Tuple of (ĐB numbers, G1 numbers, G7 numbers)
-        G7 is a list of lists, where each inner list contains 4 numbers
+        Tuple of (ĐB numbers, G1 numbers, G7 numbers, G6 numbers)
+        G7 and G6 are lists of lists, where each inner list contains the numbers for that day
     """
     url = f"https://www.kqxs88.live/api/front/open/lottery/history/list/game?limitNum={total_days}&gameCode=miba"
     
@@ -338,6 +339,7 @@ def fetch_xsmb_full(total_days: int) -> Tuple[List[str], List[str], List[List[st
         db_numbers = []
         g1_numbers = []
         g7_numbers = []
+        g6_numbers = []
         
         for issue in issue_list[:total_days]:
             detail_str = issue.get("detail", "")
@@ -355,22 +357,29 @@ def fetch_xsmb_full(total_days: int) -> Tuple[List[str], List[str], List[List[st
                 
                 db = prizes[0] if len(prizes) > 0 else ""
                 g1 = prizes[1] if len(prizes) > 1 else ""
+                g6_str = prizes[6] if len(prizes) > 6 else ""
                 g7_str = prizes[7] if len(prizes) > 7 else ""
                 
                 # Parse G7 (comma-separated: "68,12,40,09")
                 g7_list = []
                 if g7_str:
                     g7_list = [num.strip().zfill(2) for num in g7_str.split(",")]
+
+                # Parse G6 (comma-separated)
+                g6_list = []
+                if g6_str:
+                    g6_list = [num.strip() for num in g6_str.split(",")]
                 
                 db_numbers.append(db)
                 g1_numbers.append(g1)
                 g7_numbers.append(g7_list)
+                g6_numbers.append(g6_list)
                 
             except json.JSONDecodeError as e:
                 logging.error(f"Error parsing Miền Bắc detail: {e}")
                 continue
         
-        return db_numbers, g1_numbers, g7_numbers
+        return db_numbers, g1_numbers, g7_numbers, g6_numbers
         
     except requests.exceptions.RequestException as e:
         logging.error(f"Error fetching Miền Bắc data: {e}")
