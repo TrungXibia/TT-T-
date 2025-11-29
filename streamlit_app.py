@@ -201,18 +201,17 @@ def get_master_data(num_days):
         
         dt = f_dt.result()
         tt = f_tt.result()
-        mb_db, mb_g1, mb_g7, mb_g6 = f_mb.result()
+        mb_db, mb_g1, mb_g7 = f_mb.result()
 
     # Xử lý khớp ngày (Quan trọng để không bị lệch)
     df_dt = pd.DataFrame(dt)
     df_tt = pd.DataFrame(tt)
     
     xsmb_rows = []
-    limit = min(len(dt), len(mb_db), len(mb_g1), len(mb_g7), len(mb_g6))
+    limit = min(len(dt), len(mb_db), len(mb_g1), len(mb_g7))
     for i in range(limit):
         # Extract last 2 digits from each G7 number
         g7_2so_list = [num[-2:] for num in mb_g7[i]] if mb_g7[i] else []
-        g6_2so_list = [num[-2:] for num in mb_g6[i]] if mb_g6[i] else []
         
         xsmb_rows.append({
             "date": dt[i]["date"], # Dùng ngày của Điện Toán làm chuẩn
@@ -221,9 +220,7 @@ def get_master_data(num_days):
             "g1_full": mb_g1[i],
             "g1_2so": mb_g1[i][-2:],
             "g7_list": mb_g7[i],  # List of 4 full numbers
-            "g7_2so": g7_2so_list,  # List of 4 last-2-digits
-            "g6_list": mb_g6[i],
-            "g6_2so": g6_2so_list
+            "g7_2so": g7_2so_list  # List of 4 last-2-digits
         })
     df_xsmb = pd.DataFrame(xsmb_rows)
 
@@ -263,14 +260,14 @@ st.divider()
 
 # Row 1: Nguồn và Miền
 c1, c2 = st.columns([1, 1])
-src_mode = c1.selectbox("Nguồn:", ["Điện Toán", "Thần Tài"])
+src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán"])
 region = c2.selectbox("Miền:", ["Miền Bắc", "Miền Nam", "Miền Trung"])
 
 # Row 2: Thứ, Đài, Giải (cho Miền Nam/Trung) hoặc So với (cho Miền Bắc)
 if region == "Miền Bắc":
     # Miền Bắc: Giữ nguyên logic cũ
     c3, c4, c5 = st.columns([1.5, 1.5, 1.5])
-    comp_mode = c3.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất", "Giải 7", "Giải 6"])
+    comp_mode = c3.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất", "Giải 7"])
     check_range = c4.slider("Khung nuôi (ngày):", 1, 20, 7)
     backtest_mode = c5.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
     
@@ -279,10 +276,8 @@ if region == "Miền Bắc":
         col_comp = "xsmb_2so"
     elif "Nhất" in comp_mode:
         col_comp = "g1_2so"
-    elif "Giải 7" in comp_mode:
+    else:  # Giải 7
         col_comp = "g7_2so"
-    else:  # Giải 6
-        col_comp = "g6_2so"
     selected_station = None
     
 else:
@@ -309,7 +304,7 @@ else:
         selected_station = c4.selectbox("Đài:", station_options)
     
     # Dropdown Giải
-    prize_mode = c5.selectbox("Giải:", ["ĐB", "G1", "G8", "G7"])
+    prize_mode = c5.selectbox("Giải:", ["ĐB", "G1", "G8"])
     
     # Khung nuôi và Backtest
     check_range = c6.slider("Khung:", 1, 20, 7)
@@ -320,10 +315,8 @@ else:
         col_comp = "db_2so"
     elif prize_mode == "G1":
         col_comp = "g1_2so"
-    elif prize_mode == "G8":
+    else:  # G8
         col_comp = "g8_2so"
-    else:  # G7
-        col_comp = "g7_2so"
 
 # Tự động phân tích
 backtest_offset = 0
@@ -487,8 +480,8 @@ for i in range(start_idx, end_idx):
     date_results = []
     if region == "Miền Bắc":
         val = row.get(col_comp, "")
-        # Handle G7/G6 (list of numbers) vs ĐB/G1 (single value)
-        if col_comp in ["g7_2so", "g6_2so"] and isinstance(val, list):
+        # Handle G7 (list of 4 numbers) vs ĐB/G1 (single value)
+        if col_comp == "g7_2so" and isinstance(val, list):
             for g7_num in val:
                 if g7_num and g7_num != "nan":
                     date_results.append({'station': 'XSMB', 'val': g7_num})
@@ -578,7 +571,7 @@ else:
                         
                         if region == "Miền Bắc":
                             val = check_row.get(col_comp, "")
-                            if col_comp in ["g7_2so", "g6_2so"] and isinstance(val, list):
+                            if col_comp == "g7_2so" and isinstance(val, list):
                                 for g7_num in val:
                                     if g7_num and g7_num != "nan":
                                         check_results.append({'station': 'XSMB', 'val': g7_num})
@@ -643,7 +636,7 @@ else:
                     check_row = df_region.iloc[idx]
                     if region == "Miền Bắc":
                         val = check_row.get(col_comp, "")
-                        if col_comp in ["g7_2so", "g6_2so"] and isinstance(val, list):
+                        if col_comp == "g7_2so" and isinstance(val, list):
                             for g7_num in val:
                                 if g7_num and g7_num != "nan":
                                     check_results.append({'station': 'XSMB', 'val': g7_num})
@@ -710,7 +703,7 @@ else:
                     check_row = df_region.iloc[idx]
                     if region == "Miền Bắc":
                         val = check_row.get(col_comp, "")
-                        if col_comp in ["g7_2so", "g6_2so"] and isinstance(val, list):
+                        if col_comp == "g7_2so" and isinstance(val, list):
                             for g7_num in val:
                                 if g7_num and g7_num != "nan":
                                     check_results.append({'station': 'XSMB', 'val': g7_num})
@@ -988,4 +981,3 @@ else:
             st.success("Tất cả các dàn đang trong chu kỳ bình thường")
     else:
         pass  # Không có dữ liệu để phân tích chu kỳ
-
