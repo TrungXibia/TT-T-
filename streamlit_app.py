@@ -248,9 +248,19 @@ with st.sidebar:
     st.caption("Version: Matrix View")
     days_fetch = st.number_input("Số ngày tải:", 30, 365, 60, step=10)
     days_show = st.slider("Hiển thị:", 10, 100, 20)
+    max_cols = st.slider("Số cột tối đa:", 10, 30, 20)
+    st.session_state['max_cols'] = max_cols
     if st.button("🔄 Tải lại dữ liệu", type="primary"):
         st.cache_data.clear()
         st.rerun()
+
+@st.cache_data(ttl=1800)
+def get_station_data(station_name: str, total_days: int):
+    return data_fetcher.fetch_station_data(station_name, total_days)
+
+@st.cache_data(ttl=1800)
+def get_all_stations(region: str):
+    return data_fetcher.get_all_stations_in_region(region)
 
 # --- LOAD DATA ---
 try:
@@ -275,7 +285,7 @@ tab_2d, tab_3d = st.tabs(["2D (Nhị Hợp)", "3D (Tam Hợp)"])
 def render_matrix_view(mode_3d=False):
     # Row 1: Nguồn và Miền
     c1, c2 = st.columns([1, 1])
-    src_mode = c1.selectbox("Nguồn:", ["Điện Toán", "Thần Tài"], key=f"src_{mode_3d}")
+    src_mode = c1.selectbox("Nguồn:", ["Điện Toán", "Thần Tài", "Ghép TT+ĐT"], key=f"src_{mode_3d}")
     region = c2.selectbox("Miền:", ["Miền Bắc", "Miền Nam", "Miền Trung"], key=f"reg_{mode_3d}")
 
     # Row 2: Thứ, Đài, Giải (cho Miền Nam/Trung) hoặc So với (cho Miền Bắc)
@@ -365,13 +375,13 @@ def render_matrix_view(mode_3d=False):
         # Load dữ liệu từ API
         if selected_station == "Tất cả":
             # Load tất cả các đài trong MIỀN (để có full data cho check liên tục)
-            all_stations = data_fetcher.get_all_stations_in_region(region)
+            all_stations = get_all_stations(region)
             
             with st.spinner(f"🔄 Đang tải dữ liệu toàn bộ {region} ({len(all_stations)} đài)..."):
                 all_station_data = []
-                # Tải song song
+                # Tải song song (dùng cache)
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future_to_station = {executor.submit(data_fetcher.fetch_station_data, s, days_fetch): s for s in all_stations}
+                    future_to_station = {executor.submit(get_station_data, s, days_fetch): s for s in all_stations}
                     for future in concurrent.futures.as_completed(future_to_station):
                         station_name = future_to_station[future]
                         try:
@@ -438,7 +448,7 @@ def render_matrix_view(mode_3d=False):
         else:
             # Load dữ liệu cho đài đã chọn
             with st.spinner(f"🔄 Đang tải dữ liệu {selected_station}..."):
-                station_data = data_fetcher.fetch_station_data(selected_station, total_days=days_fetch)
+                station_data = get_station_data(selected_station, total_days=days_fetch)
                 
                 if not station_data:
                     st.error(f"⚠️ Không thể tải dữ liệu cho {selected_station}")
@@ -483,13 +493,23 @@ def render_matrix_view(mode_3d=False):
 
         src_str = ""
         if src_mode == "Thần Tài": 
-            src_str = str(row_src.get('tt_number', ''))
+            tt_val = row_src.get('tt_number', '')
+            src_str = str(tt_val)
         elif src_mode == "Điện Toán": 
             val = row_src.get('dt_numbers', [])
             if isinstance(val, list):
                  src_str = "".join(val)
             else:
                  src_str = str(val) if pd.notna(val) else ""
+        else:
+            tt_raw = row_src.get('tt_number', '')
+            tt_part = str(tt_raw)
+            dt_raw = row_src.get('dt_numbers', [])
+            if isinstance(dt_raw, list):
+                dt_part = "".join(dt_raw)
+            else:
+                dt_part = str(dt_raw) if pd.notna(dt_raw) else ""
+            src_str = (tt_part if tt_part and tt_part != "nan" else "") + (dt_part if dt_part and dt_part != "nan" else "")
         
         if not src_str or src_str == "nan": 
             continue
@@ -538,7 +558,7 @@ def render_matrix_view(mode_3d=False):
         st.markdown("### 📋 Bảng Theo Dõi")
         
         # Giới hạn số cột tối đa để tránh vỡ khung trên mobile
-        MAX_COLS = 20
+        MAX_COLS = st.session_state.get('max_cols', 20)
         
         # Lookup for verification
         check_source_lookup = df_check_source.set_index('date') if df_check_source is not None and not df_check_source.empty else pd.DataFrame()
